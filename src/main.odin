@@ -9,7 +9,8 @@ main :: proc() {
 
     rs.init()
 
-    id, err := rs.load("fonts/proggy_clean.ttf")
-    rs.get(id, .Font);
+    id := rs.load("fonts/proggy_clean.ttf", .Font)
+    // font := rs.get(id, .Font);
+    // font.data
     rs.unload(id);
 }

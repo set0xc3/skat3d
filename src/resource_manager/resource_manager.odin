@@ -1,9 +1,14 @@
+// resources [...]
+// audio_buf [...]
+// fonts_buf [...]
+// images_buf [...]
+
 package resource_manager
 
 import sa "core:container/small_array"
 import "core:fmt"
-import "core:strings"
 import "core:os"
+import "core:strings"
 
 import "skat3d:core"
 
@@ -19,6 +24,13 @@ Error :: enum {
 	Allocation_Failed,
 }
 
+Image :: struct {}
+
+Font :: struct {
+}
+
+Audio :: struct {}
+
 Resource_Type :: enum {
 	Image,
 	Font,
@@ -30,38 +42,39 @@ Resource_Base :: struct {
 	path: string,
 }
 
-Font :: struct {
-    data: rawptr,
-}
-
 Context :: struct {
-	basepath: string,
 	resorces: sa.Small_Array(1024, Resource_Base),
 }
 
 ctx: ^Context
 
-init :: proc(path: string = "res://") -> (err: Error) {
+init :: proc() {
 	ctx = new(Context)
-	ctx.basepath = path
+}
+
+load :: proc(path: string, type: Resource_Type) -> (id: ResourceID) {
+	switch type {
+	case .Image:
+	case .Font:
+		data, ok := os.read_entire_file_from_filename(path)
+	case .Audio:
+	}
+
 	return
 }
 
-load :: proc(path: string) -> (id: ResourceID, err: Error) {
-    data, ok := os.read_entire_file_from_filename("assets/fonts/proggy_clean.ttf");
-	return
+unload :: proc(id: ResourceID) {
 }
 
-unload :: proc(id: ResourceID) -> (err: Error) {
-	return
+delete :: proc() {
 }
 
-delete :: proc() -> (err: Error) {
-	return
-}
-
-get :: proc(id: ResourceID, type: Resource_Type) -> (err: Error) {
-    return
+get :: proc(id: ResourceID, type: Resource_Type) {
+	switch type {
+	case .Image:
+	case .Font:
+	case .Audio:
+	}
 }
 
 print :: proc() {
