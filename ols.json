@@ -1,10 +1,7 @@
 {
     "$schema": "https://raw.githubusercontent.com/DanielGavin/ols/master/misc/ols.schema.json",
     "collections": [
-        { "name": "core", "path": "C:/Users/lab/vault/bin/odin/core" },
-        { "name": "vendor", "path": "C:/Users/lab/vault/bin/odin/vendor" },
-        { "name": "examples", "path": "C:/Users/lab/vault/bin/odin/examples" },
-        { "name": "skat3d", "path": "src" }
+        { "name": "live", "path": "src" }
     ],
     "enable_document_symbols": true,
     "enable_semantic_tokens": true,

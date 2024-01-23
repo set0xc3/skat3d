@@ -1,16 +1,21 @@
-package skat3d
+package live
 
 import "core:fmt"
+import rl "vendor:raylib"
 
-import rs "resource_manager"
+import "live:game"
 
 main :: proc() {
-	fmt.println("Skat3D")
+  rl.SetTargetFPS(60);
+	rl.InitWindow(1280, 720, "Live")
 
-    rs.init()
+	game.start()
 
-    id := rs.load("fonts/proggy_clean.ttf", .Font)
-    // font := rs.get(id, .Font);
-    // font.data
-    rs.unload(id);
+	for !rl.WindowShouldClose() {
+		game.update()
+	}
+
+	game.stop()
+
+	rl.CloseWindow()
 }
