@@ -1,7 +1,13 @@
 package core
 
 import "core:math/rand"
+import "core:math/linalg"
 import "core:strings"
+
+Vector2 :: linalg.Vector2f32
+Vector3 :: linalg.Vector3f32
+Vector4 :: linalg.Vector4f32
+Quaternion :: linalg.Quaternionf32
 
 UUID_SIZE :: 16
 UUID4 :: []byte

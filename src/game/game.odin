@@ -10,6 +10,8 @@ import "core:math/linalg"
 
 import rl "vendor:raylib"
 
+import "live:ui"
+
 MAX_FRAME_SPEED :: 15
 MIN_FRAME_SPEED :: 1
 
@@ -74,15 +76,17 @@ player_draw :: proc(player: ^Player) {
 }
 
 start :: proc() {
+  ui.init()
+
 	player = player_create()
 
-	camera.offset = {1280 / 2, 720 / 2}
 	camera.zoom = 1.0
 
 	player.texture = rl.LoadTexture("resources/player/player.png")
 }
 
 update :: proc() {
+
 	rl.BeginDrawing()
 	rl.ClearBackground(rl.WHITE)
 	rl.BeginMode2D(camera)
@@ -93,10 +97,25 @@ update :: proc() {
 		camera.target = res
 	}
 
-	player_update(player)
-	player_draw(player)
+  ui.begin()
 
-	rl.DrawText("Congrats! You created your first window!", 0, 0, 20, rl.BLACK)
+	ui.begin_frame("Frame 1", pos = {0, 0}, size = {200, 200})
+	ui.button("")
+	ui.end_frame()
+
+	ui.begin_frame("Frame 2", pos = {100, 100}, size = {200, 200})
+	ui.button("")
+	ui.end_frame()
+
+	ui.begin_frame("Frame 3", pos = {200, 200}, size = {200, 200})
+	ui.button("")
+	ui.end_frame()
+
+	ui.begin_frame("Frame 4", pos = {300, 300}, size = {200, 200})
+	ui.button("")
+	ui.end_frame()
+
+  ui.end()
 
 	rl.EndMode2D()
 	rl.EndDrawing()
