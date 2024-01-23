@@ -19,6 +19,8 @@ Frame :: struct {
 }
 
 frame_stack: [1000]Frame
+curr_frame: ^Frame
+
 frame_points: [1000]^Frame
 
 frame_count: u32
@@ -31,7 +33,8 @@ element_stack: [1000]Element
 element_count: u32
 element_idx: u32
 
-padding: f32 = 4.0
+frame_inner_padding: f32 = 4.0
+total_size: core.Vector2
 
 last_mouse_pos: core.Vector2
 curr_mouse_pos: core.Vector2
@@ -98,14 +101,20 @@ end :: proc() {
 	}
 
 	if hot_frame != nil {
-		rl.DrawText(hot_frame.name, (1280 / 2) - cast(i32)padding, cast(i32)padding, 20, rl.BLACK)
+		rl.DrawText(
+			hot_frame.name,
+			(1280 / 2) - cast(i32)frame_inner_padding,
+			cast(i32)frame_inner_padding,
+			20,
+			rl.BLACK,
+		)
 	}
 
 	if frame_points[frame_count - 1] != nil {
 		rl.DrawText(
 			frame_points[frame_count - 1].name,
-			(1280 / 2) - cast(i32)padding,
-			cast(i32)(20 + padding),
+			(1280 / 2) - cast(i32)frame_inner_padding,
+			cast(i32)(20 + frame_inner_padding),
 			20,
 			rl.BLACK,
 		)
@@ -114,8 +123,8 @@ end :: proc() {
 	if focus_frame != nil {
 		rl.DrawText(
 			focus_frame.name,
-			(1280 / 2) - cast(i32)padding,
-			cast(i32)(40 + padding),
+			(1280 / 2) - cast(i32)frame_inner_padding,
+			cast(i32)(40 + frame_inner_padding),
 			20,
 			rl.BLACK,
 		)
@@ -125,30 +134,38 @@ end :: proc() {
 	frame_idx = 0
 	element_count = 0
 	element_idx = 0
+	total_size = {}
 }
 
 begin_frame :: proc(name: cstring, pos: core.Vector2 = {}, size: core.Vector2 = {20, 20}) {
 	frame := &frame_stack[frame_idx]
 	frame.name = name
-	// frame.pos = pos + padding
+	// frame.pos = pos + frame_inner_padding
 	frame.size = size
-
+	curr_frame = frame
 	frame_count += 1
 }
 
 end_frame :: proc() {
+	curr_frame = nil
 	frame_idx += 1
 }
 
 button :: proc(name: cstring) {
+	if (curr_frame == nil) {
+		return
+	}
+
 	frame := &frame_stack[frame_idx]
 	element := &element_stack[element_idx]
 
-	element.pos = frame.pos + padding
+	element.pos = (frame.pos + {0, total_size.y + cast(f32)(2.0 * element_idx)}) + frame_inner_padding
 	element.size = core.Vector2{100, 20}
 
 	frame.child_elements[frame.child_element_idx] = element
 	frame.child_element_idx += 1
+
+	total_size += element.size
 
 	element_count += 1
 	element_idx += 1

@@ -100,19 +100,9 @@ update :: proc() {
   ui.begin()
 
 	ui.begin_frame("Frame 1", pos = {0, 0}, size = {200, 200})
-	ui.button("")
-	ui.end_frame()
-
-	ui.begin_frame("Frame 2", pos = {100, 100}, size = {200, 200})
-	ui.button("")
-	ui.end_frame()
-
-	ui.begin_frame("Frame 3", pos = {200, 200}, size = {200, 200})
-	ui.button("")
-	ui.end_frame()
-
-	ui.begin_frame("Frame 4", pos = {300, 300}, size = {200, 200})
-	ui.button("")
+  for i in 0..<10 {
+  	ui.button("")
+  }
 	ui.end_frame()
 
   ui.end()
