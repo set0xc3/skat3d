@@ -7,7 +7,9 @@ import "live:game"
 
 main :: proc() {
   rl.SetTargetFPS(60);
+  
 	rl.InitWindow(1280, 720, "Live")
+  rl.SetWindowState({.WINDOW_RESIZABLE})
 
 	game.start()
 

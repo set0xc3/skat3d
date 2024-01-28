@@ -10,7 +10,11 @@ import "core:math/linalg"
 
 import rl "vendor:raylib"
 
+import "live:core"
 import "live:ui"
+
+WINDOW_WIDTH: f32
+WINDOW_HEIGHT: f32
 
 MAX_FRAME_SPEED :: 15
 MIN_FRAME_SPEED :: 1
@@ -69,14 +73,18 @@ player_draw :: proc(player: ^Player) {
 	}
 	origin := Vector2{frameWidth, frameHeight}
 
-  rl.DrawTexturePro(player.texture, sourceRec, destRec, origin, 0, rl.WHITE)
+	rl.DrawTexturePro(player.texture, sourceRec, destRec, origin, 0, rl.WHITE)
 
-  rl.DrawRectangleLinesEx({player.position.x, player.position.y, player.size.x, player.size.y}, 1, rl.GREEN)
+	rl.DrawRectangleLinesEx(
+		{player.position.x, player.position.y, player.size.x, player.size.y},
+		1,
+		rl.GREEN,
+	)
 	// rl.DrawRectangleV(player.position, player.size, rl.RED)
 }
 
 start :: proc() {
-  ui.init()
+	ui.init()
 
 	player = player_create()
 
@@ -86,6 +94,8 @@ start :: proc() {
 }
 
 update :: proc() {
+	WINDOW_WIDTH = cast(f32)rl.GetScreenWidth()
+	WINDOW_HEIGHT = cast(f32)rl.GetScreenHeight()
 
 	rl.BeginDrawing()
 	rl.ClearBackground(rl.WHITE)
@@ -97,15 +107,28 @@ update :: proc() {
 		camera.target = res
 	}
 
-  ui.begin()
+	@(static)
+	test: u32 = 0
+	if rl.IsKeyReleased(.SPACE) {
+		test += 1
+	}
 
-	ui.begin_frame("Frame 1", pos = {0, 0}, size = {200, 200})
-  for i in 0..<10 {
-  	ui.button("")
-  }
+	ui.begin()
+
+	ui.begin_docker()
+
+	ui.begin_frame("Frame")
 	ui.end_frame()
 
-  ui.end()
+	// ui.begin_frame("Frame 3")
+	// ui.end_frame()
+	//
+	// ui.begin_frame("Frame 4")
+	// ui.end_frame()
+
+	ui.end_docker()
+
+	ui.end()
 
 	rl.EndMode2D()
 	rl.EndDrawing()
