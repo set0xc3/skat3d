@@ -6,6 +6,7 @@
 
 package game
 
+import "core:fmt"
 import "core:math/linalg"
 
 import rl "vendor:raylib"
@@ -107,26 +108,16 @@ update :: proc() {
 		camera.target = res
 	}
 
-	@(static)
-	test: u32 = 0
-	if rl.IsKeyReleased(.SPACE) {
-		test += 1
-	}
-
 	ui.begin()
 
-	ui.begin_docker()
+	if ui.button("Quit") {
+		fmt.println("Quit")
+	}
 
-	ui.begin_frame("Frame")
-	ui.end_frame()
-
-	// ui.begin_frame("Frame 3")
-	// ui.end_frame()
-	//
-	// ui.begin_frame("Frame 4")
-	// ui.end_frame()
-
-	ui.end_docker()
+  ui.set_cursor_pos({100, 100})
+	if ui.button("Save") {
+		fmt.println("Save")
+	}
 
 	ui.end()
 

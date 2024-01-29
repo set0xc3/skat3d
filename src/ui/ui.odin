@@ -17,32 +17,21 @@ Object :: struct {
 	is_dirty: bool,
 }
 
-Frame :: struct {
-	using object:    Object,
-	child_frames:    [MAX_OBJECTS]^Frame,
-	child_frame_len: u32,
-}
+hot_object: ^Object
 
 object_list: [MAX_OBJECTS]Object
 object_len: u32
 
-curr_object: ^Object
-hot_object: ^Object
-focus_object: ^Object
+block_interaction: bool
 
-frame_list: [MAX_OBJECTS]Frame
-frame_len: u32
-
-is_docking: bool
-is_build_docking: bool
-docker_list: [MAX_OBJECTS]^Frame
-docker_len: u32
-
-total_size: rl.Vector2
 last_mouse_pos: rl.Vector2
 curr_mouse_pos: rl.Vector2
 mouse_delta: rl.Vector2
 cursor_pos: rl.Vector2
+
+mouse_button_down: bool
+mouse_button_released: bool
+mouse_button_pressed: bool
 
 init :: proc() {
 }
@@ -59,90 +48,62 @@ begin :: proc() {
 	curr_mouse_pos = rl.GetMousePosition()
 	mouse_delta = curr_mouse_pos - last_mouse_pos
 
-	if hot_object != nil {
-		hot_object.pos += mouse_delta
+	mouse_button_down = rl.IsMouseButtonDown(.LEFT)
+	mouse_button_released = rl.IsMouseButtonReleased(.LEFT)
+	mouse_button_pressed = rl.IsMouseButtonPressed(.LEFT)
+
+	if mouse_button_released {
+		hot_object = nil
+		block_interaction = false
 	}
 }
 
 end :: proc() {
-	for &frame, index in frame_list[0:frame_len] {
-		rect := rl.Rectangle{frame.pos.x, frame.pos.y, frame.size.x, frame.size.y}
-		rl.DrawRectangleV({rect.x, rect.y}, {rect.width, rect.height}, rl.RED)
-		rl.DrawRectangleLinesEx(rect, 1.0, rl.BLACK)
-		rl.DrawText(
-			frame.name,
-			cast(i32)(rect.x + rect.width / 2),
-			cast(i32)(rect.y + rect.height / 2),
-			20,
-			rl.BLACK,
-		)
-	}
-
-	frame_len = 0
-}
-
-begin_frame :: proc(name: cstring, size: rl.Vector2 = {100, 100}) {
-	if is_docking == true {
-		if docker_list[docker_len] == nil {
-			frame_list[frame_len] = {
-				name = name,
-				size = size,
+	for &object, index in object_list[0:object_len] {
+		if mouse_button_pressed {
+			if rl.CheckCollisionPointRec(
+				   curr_mouse_pos,
+				   {object.pos.x, object.pos.y, object.size.x, object.size.y},
+			   ) {
+				hot_object = &object
 			}
-			docker_list[docker_len] = &frame_list[frame_len]
 		}
-		docker_len += 1
+
+		rect := rl.Rectangle{object.pos.x, object.pos.y, object.size.x, object.size.y}
+		rl.DrawRectangleV({rect.x, rect.y}, {rect.width, rect.height}, rl.GREEN)
+		rl.DrawRectangleLinesEx(rect, 1.0, rl.BLACK)
+		rl.DrawText(object.name, cast(i32)rect.x, cast(i32)rect.y, 20, rl.BLACK)
 	}
 
-	frame_len += 1
+	// Hot Object
+	{
+		rl.DrawText("HotObject:", 800 - 120, 4, 20, rl.BLACK)
+		if hot_object != nil {
+			rl.DrawText(hot_object.name, 800, 4, 20, rl.BLACK)
+		}
+	}
+
+	object_len = 0
 }
 
-end_frame :: proc() {
+button :: proc(name: cstring, size: rl.Vector2 = {100, 20}) -> (res: bool) {
+	object := &object_list[object_len]
+	object.name = name
+	object.size = size
+
+	if cursor_pos.x != 0 || cursor_pos.y != 0 {
+		object.pos = cursor_pos
+	}
+
+	if hot_object == object {
+		res = true
+	}
+
+	object_len += 1
+	cursor_pos = {}
+	return
 }
 
 set_cursor_pos :: proc(pos: rl.Vector2) {
 	cursor_pos = pos
-}
-
-begin_docker :: proc() {
-	is_docking = true
-}
-
-end_docker :: proc() {
-	last_size: rl.Vector2
-	last_frame: ^Frame
-
-	for &frame, index in docker_list[0:docker_len] {
-		if is_build_docking == false {
-			if index == 0 {
-				frame.size = {WINDOW_WIDTH / cast(f32)(docker_len), WINDOW_HEIGHT}
-			} else {
-				frame.pos.x = last_frame.pos.x + last_frame.size.x
-				frame.size.x = last_frame.size.x
-				frame.size.y = WINDOW_HEIGHT
-			}
-		}
-
-		if rl.IsMouseButtonDown(.LEFT) {
-			if rl.CheckCollisionPointRec(
-				   curr_mouse_pos,
-				   rl.Rectangle{frame.pos.x, frame.pos.y, frame.size.x, frame.size.y},
-			   ) ==
-			   true {
-				frame.size.x += mouse_delta.x
-        // docker_list[index+1].pos.x = frame.size.x
-        // docker_list[index+1].size.x = frame.pos.x - frame.size.x
-        // docker_list[index+1].pos.x += mouse_delta.x
-        // docker_list[index+1].size.x -= mouse_delta.x
-				// fmt.printf("Collision\n")
-        // is_build_docking = false
-			}
-		}
-
-		last_size.x += frame.size.x
-		last_frame = frame
-	}
-
-	is_build_docking = true
-	is_docking = false
-	docker_len = 0
 }
