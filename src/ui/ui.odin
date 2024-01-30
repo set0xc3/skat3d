@@ -15,7 +15,6 @@ Object :: struct {
 	pos:      rl.Vector2,
 	size:     rl.Vector2,
 	is_dirty: bool,
-	idx:      u32,
 }
 
 hot_object: ^Object
@@ -92,7 +91,6 @@ end :: proc() {
 
 button :: proc(name: cstring, size: rl.Vector2 = {100, 30}) -> (res: bool) {
 	object := &object_list[object_len]
-	object.idx = object_len
 	object.name = name
 	object.size = size
 
@@ -100,30 +98,22 @@ button :: proc(name: cstring, size: rl.Vector2 = {100, 30}) -> (res: bool) {
 		object.pos = cursor_pos
 	}
 
-	// Only set hot_object if the left mouse button is pressed and the cursor is over the current object
 	if rl.IsMouseButtonPressed(.LEFT) {
-		if rl.CheckCollisionPointRec(
-			   curr_mouse_pos,
-			   {object.pos.x, object.pos.y, object.size.x, object.size.y},
-		   ) {
+		if object == focus_object {
 			hot_object = object
 		}
-	}
-
-	// Process button press only if hot_object matches the current object
-	if hot_object == object && rl.IsMouseButtonReleased(.LEFT) {
-		if focus_object == object &&
-		   rl.CheckCollisionPointRec(
-			   curr_mouse_pos,
-			   {object.pos.x, object.pos.y, object.size.x, object.size.y},
-		   ) {
+	} else if rl.IsMouseButtonReleased(.LEFT) {
+		if object == focus_object && object == hot_object {
 			res = true
+			hot_object = nil
+		} else if object != focus_object && object == hot_object {
+			hot_object = nil
 		}
-		hot_object = nil
 	}
 
 	object_len += 1
 	cursor_pos = {}
+
 	return
 }
 

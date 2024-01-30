@@ -37,19 +37,18 @@ main :: proc() {
 		ui.begin()
 
 		ui.set_cursor_pos({0, 0})
-		if ui.button("New") {
+		if ui.button("New") == true {
 			fmt.println("New")
 		}
 
 		ui.set_cursor_pos({20, 20})
-		if ui.button("Load") {
+		if ui.button("Load") == true {
 			fmt.println("Load")
 		}
 
 		ui.set_cursor_pos({40, 40})
-		if ui.button("Quit") {
+		if ui.button("Quit") == true {
 			fmt.println("Quit")
-			rl.CloseWindow()
 		}
 
 		ui.end()
