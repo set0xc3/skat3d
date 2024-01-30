@@ -3,7 +3,7 @@ package ui
 import "core:fmt"
 import rl "vendor:raylib"
 
-import "live:core"
+import "skat3d:core"
 
 MAX_OBJECTS :: 1000
 

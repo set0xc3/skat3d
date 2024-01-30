@@ -1,1 +1,1 @@
-odin.exe check src -collection:live=src -debug -show-timings
+odin.exe check src -collection:skat3d=src -debug -show-timings
