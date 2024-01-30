@@ -110,13 +110,20 @@ update :: proc() {
 
 	ui.begin()
 
-	if ui.button("Quit") {
-		fmt.println("Quit")
+  ui.set_cursor_pos({0, 0})
+	if ui.button("New") {
+		fmt.println("New")
 	}
 
-  ui.set_cursor_pos({100, 100})
-	if ui.button("Save") {
-		fmt.println("Save")
+  ui.set_cursor_pos({20, 20})
+	if ui.button("Load") {
+		fmt.println("Load")
+	}
+
+  ui.set_cursor_pos({40, 40})
+	if ui.button("Quit") {
+		fmt.println("Quit")
+    rl.CloseWindow();
 	}
 
 	ui.end()
