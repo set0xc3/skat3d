@@ -59,27 +59,29 @@ end :: proc() {
 			focus_object = nil
 		}
 
-		rect := rl.Rectangle{object.pos.x, object.pos.y, object.size.x, object.size.y}
-		if hot_object == &object {
-			rl.DrawRectangleV({rect.x, rect.y}, {rect.width, rect.height}, {0, 128, 48, 255})
-		} else {
-			rl.DrawRectangleV({rect.x, rect.y}, {rect.width, rect.height}, {0, 228, 48, 255})
-		}
+		// TODO: Использовать "Командный шаблон"
+		{
+			rect := rl.Rectangle{object.pos.x, object.pos.y, object.size.x, object.size.y}
+			if &object == hot_object {
+				rl.DrawRectangleV({rect.x, rect.y}, {rect.width, rect.height}, {0, 128, 48, 255})
+			} else {
+				rl.DrawRectangleV({rect.x, rect.y}, {rect.width, rect.height}, {0, 228, 48, 255})
+			}
 
-		rl.DrawRectangleLinesEx(rect, 1.0, rl.BLACK)
-		rl.DrawText(object.name, cast(i32)rect.x, cast(i32)rect.y, 20, rl.BLACK)
+			rl.DrawRectangleLinesEx(rect, 1.0, rl.BLACK)
+			rl.DrawText(object.name, cast(i32)rect.x, cast(i32)rect.y, 20, rl.BLACK)
+		}
 	}
 
-	// Hot Object
+	// Debug
 	{
+		// Hot Object
 		rl.DrawText("HotObject:", 800 - 120, 4, 20, rl.BLACK)
 		if hot_object != nil {
 			rl.DrawText(hot_object.name, 800, 4, 20, rl.BLACK)
 		}
-	}
 
-	// Focus Object
-	{
+		// Focus Object
 		rl.DrawText("FocusObject:", 800 - 120, 24, 20, rl.BLACK)
 		if focus_object != nil {
 			rl.DrawText(focus_object.name, 824, 24, 20, rl.BLACK)

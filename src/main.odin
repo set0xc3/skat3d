@@ -37,17 +37,17 @@ main :: proc() {
 		ui.begin()
 
 		ui.set_cursor_pos({0, 0})
-		if ui.button("New") == true {
+		if ui.button("New") {
 			fmt.println("New")
 		}
 
 		ui.set_cursor_pos({20, 20})
-		if ui.button("Load") == true {
+		if ui.button("Load") {
 			fmt.println("Load")
 		}
 
 		ui.set_cursor_pos({40, 40})
-		if ui.button("Quit") == true {
+		if ui.button("Quit") {
 			fmt.println("Quit")
 		}
 
