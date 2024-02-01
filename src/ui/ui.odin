@@ -32,28 +32,51 @@ mouse_button_down: bool
 mouse_button_released: bool
 mouse_button_pressed: bool
 
+font: rl.Font
+camera: rl.Camera2D
+
+viewport: rl.Rectangle
+viewport_padding: rl.Vector2 = {4.0, 4.0}
+
 init :: proc() {
+	font = rl.GetFontDefault()
+	camera.zoom = 2.0
 }
 
 deinit :: proc() {
 
 }
 
-begin :: proc() {
+frame_begin :: proc() {
 	WINDOW_WIDTH = cast(f32)rl.GetScreenWidth()
 	WINDOW_HEIGHT = cast(f32)rl.GetScreenHeight()
+
+	viewport = rl.Rectangle {
+		viewport_padding.x,
+		viewport_padding.y,
+		WINDOW_WIDTH - viewport_padding.x,
+		WINDOW_HEIGHT + viewport_padding.y,
+	}
 
 	last_mouse_pos = curr_mouse_pos
 	curr_mouse_pos = rl.GetMousePosition()
 	mouse_delta = curr_mouse_pos - last_mouse_pos
+
+	rl.BeginDrawing()
+	rl.ClearBackground(rl.Color{25, 25, 25, 255})
+	rl.BeginMode2D(camera)
 }
 
-end :: proc() {
+frame_end :: proc() {
 	for &object, index in object_list[0:object_len] {
-		if rl.CheckCollisionPointRec(
-			   curr_mouse_pos,
-			   {object.pos.x, object.pos.y, object.size.x, object.size.y},
-		   ) {
+		pos: rl.Rectangle =  {
+			(object.pos.x) * camera.zoom,
+			(object.pos.y) * camera.zoom,
+			(object.size.x) * camera.zoom,
+			(object.size.y) * camera.zoom,
+		}
+
+		if rl.CheckCollisionPointRec(curr_mouse_pos, pos) {
 			focus_object = &object
 		} else if focus_object == &object {
 			focus_object = nil
@@ -61,15 +84,28 @@ end :: proc() {
 
 		// TODO: Использовать "Командный шаблон"
 		{
-			rect := rl.Rectangle{object.pos.x, object.pos.y, object.size.x, object.size.y}
-			if &object == hot_object {
-				rl.DrawRectangleV({rect.x, rect.y}, {rect.width, rect.height}, {0, 128, 48, 255})
-			} else {
-				rl.DrawRectangleV({rect.x, rect.y}, {rect.width, rect.height}, {0, 228, 48, 255})
-			}
+			rect: rl.Rectangle
 
+			rect = rl.Rectangle{object.pos.x, object.pos.y, object.size.x, object.size.y}
 			rl.DrawRectangleLinesEx(rect, 1.0, rl.BLACK)
-			rl.DrawText(object.name, cast(i32)rect.x, cast(i32)rect.y, 20, rl.BLACK)
+
+			rect = rl.Rectangle {
+				object.pos.x + 1,
+				object.pos.y + 1,
+				object.size.x - 2,
+				object.size.y - 2,
+			}
+			rl.DrawRectangleLinesEx(rect, 1.0, rl.Color{71, 71, 71, 255})
+
+			padding: f32 = 8.0
+			font_size: f32 = 16.0
+			spacing: f32 = 2.0
+			size: rl.Vector2 = rl.MeasureTextEx(font, object.name, font_size, spacing)
+			pos: rl.Vector2 =  {
+				rect.x + rect.width / 2 - size.x / 2,
+				rect.y + rect.height / 2 - size.y / 2,
+			}
+			rl.DrawTextEx(font, object.name, pos, font_size, spacing, rl.Color{225, 227, 230, 255})
 		}
 	}
 
@@ -88,7 +124,18 @@ end :: proc() {
 		}
 	}
 
+	rl.EndMode2D()
+	rl.EndDrawing()
+
 	object_len = 0
+}
+
+window_begin :: proc(name: cstring, rect: rl.Rectangle) -> (open: bool) {
+	return
+}
+
+window_end :: proc() {
+
 }
 
 button :: proc(name: cstring, size: rl.Vector2 = {100, 30}) -> (res: bool) {
