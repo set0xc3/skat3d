@@ -25,6 +25,9 @@ main :: proc() {
 		ui.frame_begin()
 
 		if (ui.window_begin("Window 1", {0, 0, 140, 60})) {
+      if ui.button("New") {
+        fmt.println("New")
+      }
 		  ui.window_end()
 		}
 
