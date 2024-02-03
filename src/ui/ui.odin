@@ -78,15 +78,9 @@ frame_begin :: proc() {
 	last_mouse_pos = curr_mouse_pos
 	curr_mouse_pos = rl.GetMousePosition()
 	mouse_delta = curr_mouse_pos - last_mouse_pos
-
-	rl.BeginDrawing()
-	rl.ClearBackground(rl.Color{25, 25, 25, 255})
-	rl.BeginMode2D(camera)
 }
 
 frame_end :: proc() {
-	rl.EndMode2D()
-	rl.EndDrawing()
 }
 
 window_begin :: proc(name: cstring, rect: rl.Rectangle) -> (open: bool) {
