@@ -1168,11 +1168,7 @@ slider :: proc(
 
 	/* draw base */
 	draw_control_frame(ctx, id, base, .BASE, opt)
-	/* draw thumb */
-	w := ctx.style.thumb_size
-	x := i32((v - low) * Real(base.w - w) / (high - low))
-	thumb := Rect{base.x + x, base.y, w, base.h}
-	draw_control_frame(ctx, id, thumb, .BUTTON, opt)
+
 	/* draw text  */
 	text_buf: [4096]byte
 	draw_control_text(ctx, fmt.bprintf(text_buf[:], fmt_string, v), base, .TEXT, opt)
