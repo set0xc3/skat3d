@@ -1155,7 +1155,7 @@ slider :: proc(
 
 	/* handle input */
 	if ctx.focus_id == id && ctx.mouse_down_bits == {.LEFT} {
-		v = low + Real(ctx.mouse_pos.x - base.x) * (high - low) / Real(base.w)
+    v += f32(ctx.mouse_delta.x)
 		if step != 0.0 {
 			v = math.floor((v + step / 2) / step) * step
 		}
