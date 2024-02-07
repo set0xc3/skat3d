@@ -3,6 +3,8 @@ package skat3d
 import "core:fmt"
 import "core:unicode/utf8"
 import "ui"
+
+import glfw "vendor:glfw"
 import rl "vendor:raylib"
 
 state := struct {
@@ -15,34 +17,6 @@ state := struct {
 	camera:          rl.Camera2D,
 } {
 	bg = {90, 95, 100, 255},
-}
-
-ui_button :: proc(
-	ctx: ^ui.Context,
-	label: string,
-	icon: ui.Icon = .NONE,
-	opt: ui.Options = {.ALIGN_CENTER},
-) -> (
-	res: ui.Result_Set,
-) {
-	id := len(label) > 0 ? ui.get_id(ctx, label) : ui.get_id(ctx, uintptr(icon))
-	r := ui.layout_next(ctx)
-	ui.update_control(ctx, id, r, opt)
-	/* handle click */
-	if ctx.mouse_pressed_bits == {.LEFT} && ctx.focus_id == id {
-		res += {.SUBMIT}
-	}
-	/* draw */
-	ui.draw_box(ctx, ui.expand_rect(r, 1), ui.Color{0, 0, 0, 255})
-	ui.draw_box(ctx, ui.expand_rect(r, 0), ui.Color{71, 71, 71, 255})
-
-	if len(label) > 0 {
-		ui.draw_control_text(ctx, label, r, .TEXT, opt)
-	}
-	if icon != .NONE {
-		ui.draw_icon(ctx, icon, r, ctx.style.colors[.TEXT])
-	}
-	return
 }
 
 main :: proc() {
@@ -229,9 +203,11 @@ all_windows :: proc(ctx: ^ui.Context) {
 	@(static)
 	opts := ui.Options{.NO_CLOSE}
 
-	if ui.window(ctx, "Demo Window", {40, 40, 300, 450}, opts) {
-		ui_button(ctx, "MyButton")
+	@(static)
+	pos := ui.Rect{0, 0, 300, 450}
+	pos.x += 1
 
+	if ui.window(ctx, "Demo Window", pos, opts) {
 		if .ACTIVE in ui.header(ctx, "Window Info") {
 			win := ui.get_current_container(ctx)
 			ui.layout_row(ctx, {54, -1}, 0)
