@@ -9,17 +9,74 @@ import "core:time"
 import gl "vendor:OpenGL"
 import SDL "vendor:sdl2"
 
-main :: proc() {
-	WINDOW_WIDTH :: 1920
-	WINDOW_HEIGHT :: 1080
+WINDOW_WIDTH: f32 = 1920
+WINDOW_HEIGHT: f32 = 1080
 
+Vertex :: struct {
+	pos: glm.vec3,
+	col: glm.vec4,
+}
+
+Shader :: struct {
+	id:   u32,
+	name: string,
+	path: string,
+}
+
+Mesh :: struct {
+	vertexes: Vertex,
+	vertices: u32,
+}
+
+Camera :: struct {
+	position, front, up: glm.vec3,
+	fovy, near, far:     f32,
+}
+
+Context :: struct {
+	shader: Shader,
+	mesh:   Mesh,
+	camera: Camera,
+}
+
+ctx: Context
+
+shader_load :: proc() -> (shader: Shader) {
+	source, source_ok := os.read_entire_file("resources/shaders/default.glsl")
+	code := strings.split_n(string(source), "#split", 2)
+
+	program, program_ok := gl.load_shaders_source(code[0], code[1])
+	if !program_ok {
+		fmt.eprintln("Failed to create GLSL program")
+		return
+	}
+
+	shader.id = program
+
+	return
+}
+
+shader_bind :: proc(shader: ^Shader) {
+	gl.UseProgram(shader.id)
+}
+
+shader_set_uniform_mat4 :: proc(shader: ^Shader, location: string, value: ^glm.mat4) {
+	uniforms := gl.get_uniforms_from_program(ctx.shader.id)
+	gl.UniformMatrix4fv(uniforms[location].location, 1, false, &value[0, 0])
+}
+
+camera_get_view_matrix :: proc(camera: ^Camera) -> glm.mat4 {
+	return glm.mat4LookAt(camera.position, camera.position + camera.front, camera.up)
+}
+
+main :: proc() {
 	window := SDL.CreateWindow(
-		"Odin SDL2 Demo",
-		SDL.WINDOWPOS_UNDEFINED,
-		SDL.WINDOWPOS_UNDEFINED,
-		WINDOW_WIDTH,
-		WINDOW_HEIGHT,
-		{.RESIZABLE, .ALLOW_HIGHDPI, .OPENGL},
+	"Odin SDL2 Demo",
+	SDL.WINDOWPOS_UNDEFINED,
+	SDL.WINDOWPOS_UNDEFINED,
+	auto_cast WINDOW_WIDTH,
+	auto_cast WINDOW_HEIGHT,
+	{.RESIZABLE,  /* .FULLSCREEN, */.ALLOW_HIGHDPI, .OPENGL},
 	)
 	if window == nil {
 		fmt.eprintln("Failed to create window")
@@ -32,21 +89,8 @@ main :: proc() {
 	// load the OpenGL procedures once an OpenGL context has been established
 	gl.load_up_to(4, 6, SDL.gl_set_proc_address)
 
-	// useful utility procedures that are part of vendor:OpenGl
-	vertex_source, vertex_source_ok := os.read_entire_file("resources/shaders/test.vert.glsl")
-	fragment_source, fragment_source_ok := os.read_entire_file("resources/shaders/test.frag.glsl")
-
-	program, program_ok := gl.load_shaders_source(string(vertex_source), string(fragment_source))
-	if !program_ok {
-		fmt.eprintln("Failed to create GLSL program")
-		return
-	}
-	defer gl.DeleteProgram(program)
-
-	gl.UseProgram(program)
-
-	uniforms := gl.get_uniforms_from_program(program)
-	defer delete(uniforms)
+	ctx.shader = shader_load()
+	shader_bind(&ctx.shader)
 
 	vao: u32
 	gl.GenVertexArrays(1, &vao);defer gl.DeleteVertexArrays(1, &vao)
@@ -55,12 +99,6 @@ main :: proc() {
 	vbo, ebo: u32
 	gl.GenBuffers(1, &vbo);defer gl.DeleteBuffers(1, &vbo)
 	gl.GenBuffers(1, &ebo);defer gl.DeleteBuffers(1, &ebo)
-
-	// struct declaration
-	Vertex :: struct {
-		pos: glm.vec3,
-		col: glm.vec4,
-	}
 
 	vertices := []Vertex {
 		{{-0.5, +0.5, 0}, {1.0, 0.0, 0.0, 0.75}},
@@ -91,6 +129,13 @@ main :: proc() {
 		gl.STATIC_DRAW,
 	)
 
+	ctx.camera.position = {0.0, 0.0, 3.0}
+	ctx.camera.up = {0.0, 1.0, 0.0}
+	ctx.camera.front = {0.0, 0.0, -1.0}
+	ctx.camera.fovy = 50
+	ctx.camera.near = 0.1
+	ctx.camera.far = 100.0
+
 	// high precision timer
 	start_tick := time.tick_now()
 
@@ -113,38 +158,32 @@ main :: proc() {
 				// labelled control flow
 				break loop
 			}
+
+			if event.window.type == .WINDOWEVENT {
+				#partial switch event.window.event {
+				case .SIZE_CHANGED:
+					WINDOW_WIDTH = auto_cast event.window.data1 * 2
+					WINDOW_HEIGHT = auto_cast event.window.data2 * 2
+				}
+			}
 		}
 
-		// Native support for GLSL-like functionality
-		pos := glm.vec3{glm.cos(t * 2), glm.sin(t * 2), 0}
+		// camera_bind(ctx.camera)
+		// shader_bind(ctx.shader)
 
-		// array programming support
-		pos *= 0.3
-
-		// matrix support
-		// model matrix which a default scale of 0.5
-		model := glm.mat4{0.5, 0, 0, 0, 0, 0.5, 0, 0, 0, 0, 0.5, 0, 0, 0, 0, 1}
-
-		// matrix indexing and array short with `.x`
-		model[0, 3] = -pos.x
-		model[1, 3] = -pos.y
-		model[2, 3] = -pos.z
-
-		// native swizzling support for arrays
-		model[3].yzx = pos.yzx
-
-		model = model * glm.mat4Rotate({0, 1, 1}, t)
-
-		view := glm.mat4LookAt({0, -1, +1}, {0, 0, 0}, {0, 0, 1})
-		proj := glm.mat4Perspective(45, 1.3, 0.1, 100.0)
-
-		// matrix multiplication
+		model := glm.identity(glm.mat4)
+		view := camera_get_view_matrix(&ctx.camera)
+		proj := glm.mat4Perspective(
+			glm.radians(ctx.camera.fovy),
+			WINDOW_WIDTH / WINDOW_HEIGHT,
+			ctx.camera.near,
+			ctx.camera.far,
+		)
 		u_transform := proj * view * model
+		shader_set_uniform_mat4(&ctx.shader, "u_transform", &u_transform)
 
-		// matrix types in Odin are stored in column-major format but written as you'd normal write them
-		gl.UniformMatrix4fv(uniforms["u_transform"].location, 1, false, &u_transform[0, 0])
-
-		gl.Viewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT)
+		// fmt.println(WINDOW_WIDTH, WINDOW_HEIGHT)
+		gl.Viewport(0, 0, auto_cast WINDOW_WIDTH, auto_cast WINDOW_HEIGHT)
 		gl.ClearColor(0.5, 0.7, 1.0, 1.0)
 		gl.Clear(gl.COLOR_BUFFER_BIT)
 
