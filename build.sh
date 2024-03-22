@@ -2,4 +2,4 @@
 
 mkdir -p bin
 
-odin build src -out:bin/skat3d -o:none -build-mode:exe -collection:skat3d=src -debug -show-timings
+odin build src -out:bin/out.bin -o:none -build-mode:exe -collection:my=src -debug -show-timings
