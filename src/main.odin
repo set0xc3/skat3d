@@ -12,20 +12,24 @@ import SDL "vendor:sdl2"
 WINDOW_WIDTH: f32 = 1920
 WINDOW_HEIGHT: f32 = 1080
 
+MAX_OBJECTS :: 1000
+
 Vertex :: struct {
 	pos: glm.vec3,
 	col: glm.vec4,
+	uv:  glm.vec2,
 }
 
 Shader :: struct {
-	id:   u32,
-	name: string,
-	path: string,
+	id:       u32,
+	name:     string,
+	path:     string,
+	vao, ebo: u32,
 }
 
 Mesh :: struct {
-	vertexes: Vertex,
-	vertices: u32,
+	vertices: []Vertex,
+	indices:  []u16,
 }
 
 Camera :: struct {
@@ -41,28 +45,91 @@ Context :: struct {
 
 ctx: Context
 
-shader_load :: proc() -> (shader: Shader) {
-	source, source_ok := os.read_entire_file("resources/shaders/default.glsl")
-	code := strings.split_n(string(source), "#split", 2)
+pre_draw :: proc() {
+	gl.Viewport(0, 0, auto_cast WINDOW_WIDTH, auto_cast WINDOW_HEIGHT)
+	gl.ClearColor(0.5, 0.7, 1.0, 1.0)
+	gl.Clear(gl.COLOR_BUFFER_BIT)
+}
 
+draw :: proc(mesh: ^Mesh) {
+	gl.DrawElements(gl.TRIANGLES, i32(len(mesh.indices)), gl.UNSIGNED_SHORT, nil)
+}
+
+present :: proc(window: ^SDL.Window) {
+	SDL.GL_SwapWindow(window)
+}
+
+shader_init :: proc(path: string) -> (shader: Shader) {
+	vao, vbo, ebo: u32
+	source, source_ok := os.read_entire_file(path)
+	code := strings.split_n(string(source), "#split", 2)
 	program, program_ok := gl.load_shaders_source(code[0], code[1])
 	if !program_ok {
 		fmt.eprintln("Failed to create GLSL program")
 		return
 	}
 
+	gl.UseProgram(program)
+
+	gl.GenBuffers(1, &vbo)
+	gl.GenBuffers(1, &ebo)
+
+	gl.BindBuffer(gl.ARRAY_BUFFER, vbo)
+	gl.BufferData(gl.ARRAY_BUFFER, size_of(Vertex) * MAX_OBJECTS, nil, gl.DYNAMIC_DRAW)
+
+	gl.GenVertexArrays(1, &vao)
+	gl.EnableVertexAttribArray(0)
+	gl.EnableVertexAttribArray(1)
+	gl.VertexAttribPointer(0, 3, gl.FLOAT, false, size_of(Vertex), offset_of(Vertex, pos))
+	gl.VertexAttribPointer(1, 4, gl.FLOAT, false, size_of(Vertex), offset_of(Vertex, col))
+	gl.VertexAttribPointer(2, 2, gl.FLOAT, false, size_of(Vertex), offset_of(Vertex, uv))
+
+	gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, ebo)
+	gl.BufferData(gl.ELEMENT_ARRAY_BUFFER, size_of(u16) * 6 * MAX_OBJECTS, nil, gl.DYNAMIC_DRAW)
+
+	gl.UseProgram(0)
+	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
+	gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, 0)
+
 	shader.id = program
+	shader.vao = vao
+	shader.ebo = ebo
 
 	return
 }
 
-shader_bind :: proc(shader: ^Shader) {
+shader_update_data :: proc(shader: ^Shader, mesh: ^Mesh) {
+	gl.BufferSubData(gl.ARRAY_BUFFER, 0, size_of(Vertex) * len(mesh.vertices), &mesh.vertices[0])
+	gl.BufferSubData(
+		gl.ELEMENT_ARRAY_BUFFER,
+		0,
+		size_of(u16) * len(mesh.indices),
+		&mesh.indices[0],
+	)
+}
+
+shader_use :: proc(shader: ^Shader) {
 	gl.UseProgram(shader.id)
+	gl.BindBuffer(gl.ARRAY_BUFFER, shader.vao)
+	gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, shader.ebo)
 }
 
 shader_set_uniform_mat4 :: proc(shader: ^Shader, location: string, value: ^glm.mat4) {
 	uniforms := gl.get_uniforms_from_program(ctx.shader.id)
 	gl.UniformMatrix4fv(uniforms[location].location, 1, false, &value[0, 0])
+}
+
+camera_use :: proc(camera: ^Camera, shader: ^Shader) {
+	model := glm.identity(glm.mat4)
+	view := camera_get_view_matrix(camera)
+	proj := glm.mat4Perspective(
+		glm.radians(camera.fovy),
+		WINDOW_WIDTH / WINDOW_HEIGHT,
+		camera.near,
+		camera.far,
+	)
+	u_mvp := proj * view * model
+	shader_set_uniform_mat4(shader, "u_mvp", &u_mvp)
 }
 
 camera_get_view_matrix :: proc(camera: ^Camera) -> glm.mat4 {
@@ -89,45 +156,18 @@ main :: proc() {
 	// load the OpenGL procedures once an OpenGL context has been established
 	gl.load_up_to(4, 6, SDL.gl_set_proc_address)
 
-	ctx.shader = shader_load()
-	shader_bind(&ctx.shader)
-
-	vao: u32
-	gl.GenVertexArrays(1, &vao);defer gl.DeleteVertexArrays(1, &vao)
-
-	// initialization of OpenGL buffers
-	vbo, ebo: u32
-	gl.GenBuffers(1, &vbo);defer gl.DeleteBuffers(1, &vbo)
-	gl.GenBuffers(1, &ebo);defer gl.DeleteBuffers(1, &ebo)
-
-	vertices := []Vertex {
-		{{-0.5, +0.5, 0}, {1.0, 0.0, 0.0, 0.75}},
-		{{-0.5, -0.5, 0}, {1.0, 1.0, 0.0, 0.75}},
-		{{+0.5, -0.5, 0}, {0.0, 1.0, 0.0, 0.75}},
-		{{+0.5, +0.5, 0}, {0.0, 0.0, 1.0, 0.75}},
+	quad_mesh: Mesh
+	quad_mesh.vertices = []Vertex {
+		{{-0.5, +0.5, 0}, {1.0, 0.0, 0.0, 1.0}, {0.0, 0.0}},
+		{{-0.5, -0.5, 0}, {1.0, 1.0, 0.0, 1.0}, {0.0, 0.0}},
+		{{+0.5, -0.5, 0}, {0.0, 1.0, 0.0, 1.0}, {0.0, 0.0}},
+		{{+0.5, +0.5, 0}, {0.0, 0.0, 1.0, 1.0}, {0.0, 0.0}},
 	}
+	quad_mesh.indices = []u16{0, 1, 2, 2, 3, 0}
 
-	indices := []u16{0, 1, 2, 2, 3, 0}
-
-	gl.BindBuffer(gl.ARRAY_BUFFER, vbo)
-	gl.BufferData(
-		gl.ARRAY_BUFFER,
-		len(vertices) * size_of(vertices[0]),
-		raw_data(vertices),
-		gl.STATIC_DRAW,
-	)
-	gl.EnableVertexAttribArray(0)
-	gl.EnableVertexAttribArray(1)
-	gl.VertexAttribPointer(0, 3, gl.FLOAT, false, size_of(Vertex), offset_of(Vertex, pos))
-	gl.VertexAttribPointer(1, 4, gl.FLOAT, false, size_of(Vertex), offset_of(Vertex, col))
-
-	gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, ebo)
-	gl.BufferData(
-		gl.ELEMENT_ARRAY_BUFFER,
-		len(indices) * size_of(indices[0]),
-		raw_data(indices),
-		gl.STATIC_DRAW,
-	)
+	ctx.shader = shader_init("resources/shaders/default.glsl")
+	shader_use(&ctx.shader)
+	shader_update_data(&ctx.shader, &quad_mesh)
 
 	ctx.camera.position = {0.0, 0.0, 3.0}
 	ctx.camera.up = {0.0, 1.0, 0.0}
@@ -161,34 +201,18 @@ main :: proc() {
 
 			if event.window.type == .WINDOWEVENT {
 				#partial switch event.window.event {
-				case .SIZE_CHANGED:
+				case .SIZE_CHANGED, .RESIZED:
 					WINDOW_WIDTH = auto_cast event.window.data1 * 2
 					WINDOW_HEIGHT = auto_cast event.window.data2 * 2
 				}
 			}
 		}
 
-		// camera_bind(ctx.camera)
-		// shader_bind(ctx.shader)
+		shader_use(&ctx.shader)
+		camera_use(&ctx.camera, &ctx.shader)
 
-		model := glm.identity(glm.mat4)
-		view := camera_get_view_matrix(&ctx.camera)
-		proj := glm.mat4Perspective(
-			glm.radians(ctx.camera.fovy),
-			WINDOW_WIDTH / WINDOW_HEIGHT,
-			ctx.camera.near,
-			ctx.camera.far,
-		)
-		u_transform := proj * view * model
-		shader_set_uniform_mat4(&ctx.shader, "u_transform", &u_transform)
-
-		// fmt.println(WINDOW_WIDTH, WINDOW_HEIGHT)
-		gl.Viewport(0, 0, auto_cast WINDOW_WIDTH, auto_cast WINDOW_HEIGHT)
-		gl.ClearColor(0.5, 0.7, 1.0, 1.0)
-		gl.Clear(gl.COLOR_BUFFER_BIT)
-
-		gl.DrawElements(gl.TRIANGLES, i32(len(indices)), gl.UNSIGNED_SHORT, nil)
-
-		SDL.GL_SwapWindow(window)
+		pre_draw()
+		draw(&quad_mesh)
+		present(window)
 	}
 }
