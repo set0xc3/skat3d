@@ -76,8 +76,9 @@ present :: proc(window: ^SDL.Window) {
 	SDL.GL_SwapWindow(window)
 }
 
-shader_ini :: proc(path: string) -> (shader: Shader) {
+shader_init :: proc(path: string) -> (shader: Shader) {
 	vao, vbo, ebo: u32
+	shader_ids: [3]u32
 
 	shader_source, shader_source_ok := os.read_entire_file(path)
 	if !shader_source_ok {
@@ -85,36 +86,41 @@ shader_ini :: proc(path: string) -> (shader: Shader) {
 		return
 	}
 
-	shaders_source := strings.split_n(string(shader_source), "#split", 3)
+	shaders_source := strings.split_n(string(shader_source), "#split", 2)
 
-	vertex_shader_id, vertex_shader_ok := gl_compile_shader_from_source(
+	shader_program_id, shader_program_ok := gl.load_shaders_source(
 		shaders_source[0],
-		gl.Shader_Type.VERTEX_SHADER,
-	);defer gl.DeleteShader(vertex_shader_id)
-
-	fragment_shader_id, fragment_shader_ok := gl_compile_shader_from_source(
 		shaders_source[1],
-		gl.Shader_Type.FRAGMENT_SHADER,
-	);defer gl.DeleteShader(fragment_shader_id)
-
-	geometry_shader_id, geometry_shader_ok := gl_compile_shader_from_source(
-		shaders_source[2],
-		gl.Shader_Type.GEOMETRY_SHADER,
-	);defer gl.DeleteShader(geometry_shader_id)
-
-	shader_program_id, shader_program_ok := gl_create_and_link_program(
-		[]u32{vertex_shader_id, fragment_shader_id, geometry_shader_id},
 	)
+
+	when false {
+		vertex_shader_id, vertex_shader_ok := gl_compile_shader_from_source(
+			shaders_source[0],
+			gl.Shader_Type.VERTEX_SHADER,
+		);defer gl.DeleteShader(vertex_shader_id)
+		shader_ids[0] = vertex_shader_id
+
+		fragment_shader_id, fragment_shader_ok := gl_compile_shader_from_source(
+			shaders_source[1],
+			gl.Shader_Type.FRAGMENT_SHADER,
+		);defer gl.DeleteShader(fragment_shader_id)
+		shader_ids[1] = fragment_shader_id
+
+		if len(shaders_source) == 3 {
+			geometry_shader_id, geometry_shader_ok := gl_compile_shader_from_source(
+				shaders_source[2],
+				gl.Shader_Type.GEOMETRY_SHADER,
+			);defer gl.DeleteShader(geometry_shader_id)
+			shader_ids[2] = geometry_shader_id
+		}
+		shader_program_id, shader_program_ok := gl_create_and_link_program(shader_ids[0:2])
+	}
 
 	gl.UseProgram(shader_program_id)
 
 	gl.GenBuffers(1, &vbo)
 	gl.BindBuffer(gl.ARRAY_BUFFER, vbo)
-	gl.BufferData(gl.ARRAY_BUFFER, 0, nil, gl.DYNAMIC_DRAW)
-
-	gl.GenBuffers(1, &ebo)
-	gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, ebo)
-	gl.BufferData(gl.ELEMENT_ARRAY_BUFFER, 0, nil, gl.DYNAMIC_DRAW)
+	gl.BufferData(gl.ARRAY_BUFFER, size_of(Vertex) * MAX_OBJECTS, nil, gl.DYNAMIC_DRAW)
 
 	gl.GenVertexArrays(1, &vao)
 	gl.EnableVertexAttribArray(0)
@@ -123,8 +129,9 @@ shader_ini :: proc(path: string) -> (shader: Shader) {
 	gl.VertexAttribPointer(2, 4, gl.FLOAT, false, size_of(Vertex), offset_of(Vertex, color))
 	gl.VertexAttribPointer(3, 2, gl.FLOAT, false, size_of(Vertex), offset_of(Vertex, uv))
 
-	gl.UseProgram(0)
-	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
+	gl.GenBuffers(1, &ebo)
+	gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, ebo)
+	gl.BufferData(gl.ELEMENT_ARRAY_BUFFER, size_of(u16) * 6 * MAX_OBJECTS, nil, gl.DYNAMIC_DRAW)
 
 	shader.id = shader_program_id
 	shader.vao = vao
@@ -136,26 +143,31 @@ shader_ini :: proc(path: string) -> (shader: Shader) {
 
 shader_update_data :: proc(shader: ^Shader, mesh: ^Mesh) {
 	shader_use(shader)
-	gl.BufferData(
+	// gl.BufferData(
+	// 	gl.ARRAY_BUFFER,
+	// 	size_of(Vertex) * len(mesh.vertices),
+	// 	&mesh.vertices[0],
+	// 	gl.DYNAMIC_DRAW,
+	// )
+	gl.BufferSubData(
 		gl.ARRAY_BUFFER,
-		size_of(Vertex) * len(mesh.vertices),
-		&mesh.vertices[0],
-		gl.DYNAMIC_DRAW,
+		0,
+		len(mesh.vertices) * size_of(mesh.vertices[0]),
+		raw_data(mesh.vertices),
 	)
-	gl.BufferSubData(gl.ARRAY_BUFFER, 0, size_of(Vertex) * len(mesh.vertices), &mesh.vertices[0])
 
 	if len(mesh.indices) > 0 {
-		gl.BufferData(
-			gl.ELEMENT_ARRAY_BUFFER,
-			size_of(u16) * len(mesh.indices),
-			&mesh.indices[0],
-			gl.DYNAMIC_DRAW,
-		)
+		// gl.BufferData(
+		// 	gl.ELEMENT_ARRAY_BUFFER,
+		// 	size_of(u16) * len(mesh.indices),
+		// 	&mesh.indices[0],
+		// 	gl.DYNAMIC_DRAW,
+		// )
 		gl.BufferSubData(
 			gl.ELEMENT_ARRAY_BUFFER,
 			0,
-			size_of(u16) * len(mesh.indices),
-			&mesh.indices[0],
+			len(mesh.indices) * size_of(mesh.indices[0]),
+			raw_data(mesh.indices),
 		)
 	}
 }
@@ -189,7 +201,7 @@ camera_init :: proc(camera_var: Camera_Variable) -> (camera_inst: Camera_Instanc
 	return
 }
 
-camera_use :: proc(camera: ^Camera_Base, shader: ^Shader) {
+camera_update :: proc(camera: ^Camera_Base, shader: ^Shader) {
 	model := glm.identity(glm.mat4)
 	view := camera_get_view_matrix(camera)
 	projection := glm.mat4Perspective(
@@ -198,6 +210,7 @@ camera_use :: proc(camera: ^Camera_Base, shader: ^Shader) {
 		camera.near,
 		camera.far,
 	)
+	shader_use(shader)
 	shader_set_uniform_mat4(shader, "u_model", &model)
 	shader_set_uniform_mat4(shader, "u_view", &view)
 	shader_set_uniform_mat4(shader, "u_projection", &projection)
@@ -230,21 +243,8 @@ main :: proc() {
 	camera_orbit: Camera_Orbit
 	camera_inst := camera_init(camera_orbit)
 
-	// quad_mesh: Mesh
-	// quad_mesh.vertices = []Vertex {
-	// 	{{-0.5, +0.5, 0}, {1.0, 0.0, 0.0, 1.0}, {0.0, 0.0}},
-	// 	{{-0.5, -0.5, 0}, {1.0, 1.0, 0.0, 1.0}, {0.0, 0.0}},
-	// 	{{+0.5, -0.5, 0}, {0.0, 1.0, 0.0, 1.0}, {0.0, 0.0}},
-	// 	{{+0.5, +0.5, 0}, {0.0, 0.0, 1.0, 1.0}, {0.0, 0.0}},
-	// }
-	// quad_mesh.indices = []u16{0, 1, 2, 2, 3, 0}
-
-	// ctx.shader = shader_init("resources/shaders/default.glsl")
-	// shader_use(&ctx.shader)
-	// shader_update_data(&ctx.shader, &quad_mesh)
-
-	grid_mesh: Mesh
-	grid_mesh.vertices = []Vertex {
+	quad_mesh: Mesh
+	quad_mesh.vertices = []Vertex {
 		 {
 			position = {-0.5, +0.5, 0},
 			normal = {0.0, 0.0, 0.0},
@@ -270,8 +270,10 @@ main :: proc() {
 			uv = {0.0, 0.0},
 		},
 	}
-	shader_grid := shader_ini("resources/shaders/grid.glsl")
-	shader_update_data(&shader_grid, &grid_mesh)
+	quad_mesh.indices = []u16{0, 1, 2, 2, 3, 0}
+
+	quad_shader := shader_init("resources/shaders/default.glsl")
+	// shader_update_data(&quad_shader, &quad_mesh)
 
 	// high precision timer
 	start_tick := time.tick_now()
@@ -305,15 +307,11 @@ main :: proc() {
 			}
 		}
 
-		// shader_use(&ctx.shader)
-		// camera_use(&ctx.camera, &ctx.shader)
-
-		// camera_use(&ctx.camera, &shader_grid)
-		// shader_use(&shader_grid)
-		// gl.DrawArrays(gl.POINTS, 0, 4)
-
 		pre_draw()
-		// draw(&quad_mesh)
+		{
+			camera_update(&camera_inst.variant.(Camera_Base), &quad_shader)
+			// draw(&quad_mesh)
+		}
 		present(window)
 	}
 }
