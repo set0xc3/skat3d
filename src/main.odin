@@ -22,10 +22,9 @@ Vertex :: struct {
 }
 
 Shader :: struct {
-	id:            u32,
-	name:          string,
-	path:          string,
-	vao, vbo, ebo: u32,
+	id:   u32,
+	name: string,
+	path: string,
 }
 
 Mesh :: struct {
@@ -77,97 +76,56 @@ present :: proc(window: ^SDL.Window) {
 }
 
 shader_init :: proc(path: string) -> (shader: Shader) {
-	vao, vbo, ebo: u32
-	shader_ids: [3]u32
-
-	shader_source, shaders_source_ok := os.read_entire_file("resources/shaders/default.glsl")
+	shader_source, shaders_source_ok := os.read_entire_file(path)
 	shaders_source := strings.split(string(shader_source), "#split")
+	shaders_id: [3]u32
 
-	vertex_shader_id := gl_compile_shader_from_source(
+	shaders_id[0] = gl_compile_shader_from_source(
 		shaders_source[0],
 		gl.Shader_Type.VERTEX_SHADER,
-	);defer gl.DeleteShader(vertex_shader_id)
+	);defer gl.DeleteShader(shaders_id[0])
 
-	geometry_shader_id := gl_compile_shader_from_source(
-		shaders_source[1],
-		gl.Shader_Type.GEOMETRY_SHADER,
-	);defer gl.DeleteShader(geometry_shader_id)
+	if len(shaders_source) == 3 {
+		shaders_id[1] = gl_compile_shader_from_source(
+			shaders_source[1],
+			gl.Shader_Type.GEOMETRY_SHADER,
+		)
+	};defer gl.DeleteShader(shaders_id[1])
 
-	fragment_shader_id := gl_compile_shader_from_source(
-		shaders_source[2],
+	shaders_id[2] = gl_compile_shader_from_source(
+		shaders_source[len(shaders_source) - 1],
 		gl.Shader_Type.FRAGMENT_SHADER,
-	);defer gl.DeleteShader(fragment_shader_id)
+	);defer gl.DeleteShader(shaders_id[2])
 
-	shader_program_id := gl_create_and_link_program(
-		[]u32{vertex_shader_id, geometry_shader_id, fragment_shader_id},
-		false,
-	)
-
-	gl.UseProgram(shader_program_id)
-
-	gl.GenBuffers(1, &vbo)
-	gl.BindBuffer(gl.ARRAY_BUFFER, vbo)
-	gl.BufferData(gl.ARRAY_BUFFER, size_of(Vertex) * MAX_OBJECTS, nil, gl.DYNAMIC_DRAW)
-
-	gl.GenVertexArrays(1, &vao)
-	gl.EnableVertexAttribArray(0)
-	gl.VertexAttribPointer(0, 3, gl.FLOAT, false, size_of(Vertex), offset_of(Vertex, position))
-	gl.VertexAttribPointer(1, 3, gl.FLOAT, false, size_of(Vertex), offset_of(Vertex, normal))
-	gl.VertexAttribPointer(2, 4, gl.FLOAT, false, size_of(Vertex), offset_of(Vertex, color))
-	gl.VertexAttribPointer(3, 2, gl.FLOAT, false, size_of(Vertex), offset_of(Vertex, uv))
-
-	gl.GenBuffers(1, &ebo)
-	gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, ebo)
-	gl.BufferData(gl.ELEMENT_ARRAY_BUFFER, size_of(u16) * 6 * MAX_OBJECTS, nil, gl.DYNAMIC_DRAW)
-
-	shader.id = shader_program_id
-	shader.vao = vao
-	shader.vbo = vbo
-	shader.ebo = ebo
+	if len(shaders_source) == 3 {
+		shader.id = gl_create_and_link_program(
+			[]u32{shaders_id[0], shaders_id[1], shaders_id[2]},
+			false,
+		)
+	} else {
+		shader.id = gl_create_and_link_program([]u32{shaders_id[0], shaders_id[2]}, false)
+	}
 
 	return
 }
 
-shader_update_data :: proc(shader: ^Shader, mesh: ^Mesh) {
-	shader_use(shader)
-	// gl.BufferData(
-	// 	gl.ARRAY_BUFFER,
-	// 	size_of(Vertex) * len(mesh.vertices),
-	// 	&mesh.vertices[0],
-	// 	gl.DYNAMIC_DRAW,
-	// )
-	gl.BufferSubData(
-		gl.ARRAY_BUFFER,
-		0,
-		len(mesh.vertices) * size_of(mesh.vertices[0]),
-		raw_data(mesh.vertices),
-	)
-
-	if len(mesh.indices) > 0 {
-		// gl.BufferData(
-		// 	gl.ELEMENT_ARRAY_BUFFER,
-		// 	size_of(u16) * len(mesh.indices),
-		// 	&mesh.indices[0],
-		// 	gl.DYNAMIC_DRAW,
-		// )
-		gl.BufferSubData(
-			gl.ELEMENT_ARRAY_BUFFER,
-			0,
-			len(mesh.indices) * size_of(mesh.indices[0]),
-			raw_data(mesh.indices),
-		)
-	}
-}
-
 shader_use :: proc(shader: ^Shader) {
 	gl.UseProgram(shader.id)
-	gl.BindBuffer(gl.ARRAY_BUFFER, shader.vao)
-	gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, shader.ebo)
 }
 
 shader_set_uniform_mat4 :: proc(shader: ^Shader, location: string, value: ^glm.mat4) {
-	uniforms := gl.get_uniforms_from_program(ctx.shader.id)
+	uniforms := gl.get_uniforms_from_program(shader.id)
 	gl.UniformMatrix4fv(uniforms[location].location, 1, false, &value[0, 0])
+}
+
+shader_set_uniform_vec2 :: proc(shader: ^Shader, location: string, value: ^glm.vec2) {
+	uniforms := gl.get_uniforms_from_program(shader.id)
+	gl.Uniform2fv(uniforms[location].location, 1, &value[0])
+}
+
+shader_set_uniform_vec3 :: proc(shader: ^Shader, location: string, value: ^glm.vec3) {
+	uniforms := gl.get_uniforms_from_program(shader.id)
+	gl.Uniform3fv(uniforms[location].location, 1, &value[0])
 }
 
 camera_init :: proc(camera_var: Camera_Variable) -> (camera_inst: Camera_Instance) {
@@ -227,40 +185,8 @@ main :: proc() {
 	gl.load_up_to(4, 6, SDL.gl_set_proc_address)
 
 	// OPENGL_BEGIN
-	shader_source, shaders_source_ok := os.read_entire_file("resources/shaders/default.glsl")
-	shaders_source := strings.split(string(shader_source), "#split")
-
-	vertex_shader_id := gl_compile_shader_from_source(
-		shaders_source[0],
-		gl.Shader_Type.VERTEX_SHADER,
-	);defer gl.DeleteShader(vertex_shader_id)
-
-	geometry_shader_id := gl_compile_shader_from_source(
-		shaders_source[1],
-		gl.Shader_Type.GEOMETRY_SHADER,
-	);defer gl.DeleteShader(geometry_shader_id)
-
-	fragment_shader_id := gl_compile_shader_from_source(
-		shaders_source[2],
-		gl.Shader_Type.FRAGMENT_SHADER,
-	);defer gl.DeleteShader(fragment_shader_id)
-
-	shader_program_id := gl_create_and_link_program(
-		[]u32{vertex_shader_id, geometry_shader_id, fragment_shader_id},
-		false,
-	)
-
-	gl.UseProgram(shader_program_id)
-
-	// assert(false)
-
-	vao: u32
-	gl.GenVertexArrays(1, &vao);defer gl.DeleteVertexArrays(1, &vao)
-
-	// initialization of OpenGL buffers
-	vbo, ebo: u32
-	gl.GenBuffers(1, &vbo);defer gl.DeleteBuffers(1, &vbo)
-	gl.GenBuffers(1, &ebo);defer gl.DeleteBuffers(1, &ebo)
+	shader_default := shader_init("resources/shaders/default.glsl")
+	shader_grid_2d := shader_init("resources/shaders/grid_2d.glsl")
 
 	vertices := []Vertex {
 		 {
@@ -290,6 +216,14 @@ main :: proc() {
 	}
 
 	indices := []u16{0, 1, 2, 2, 3, 0}
+
+	// initialization of OpenGL buffers
+	vao, vbo, ebo: u32
+	gl.GenVertexArrays(1, &vao);defer gl.DeleteVertexArrays(1, &vao)
+	gl.GenBuffers(1, &vbo);defer gl.DeleteBuffers(1, &vbo)
+	gl.GenBuffers(1, &ebo);defer gl.DeleteBuffers(1, &ebo)
+
+	gl.BindVertexArray(vao)
 
 	// Craete empty vertex buffer
 	gl.BindBuffer(gl.ARRAY_BUFFER, vbo)
@@ -329,7 +263,6 @@ main :: proc() {
 	// 	raw_data(indices),
 	// )
 
-	uniforms := gl.get_uniforms_from_program(shader_program_id);defer delete(uniforms)
 	// OPENGL_END
 
 	start_tick := time.tick_now()
@@ -385,13 +318,22 @@ main :: proc() {
 		// matrix multiplication
 		u_transform := proj * view * model
 
-		// matrix types in Odin are stored in column-major format but written as you'd normal write them
-		gl.UniformMatrix4fv(uniforms["u_transform"].location, 1, false, &u_transform[0, 0])
-
 		gl.Viewport(0, 0, auto_cast WINDOW_WIDTH, auto_cast WINDOW_HEIGHT)
 		gl.ClearColor(0.5, 0.7, 1.0, 1.0)
 		gl.Clear(gl.COLOR_BUFFER_BIT)
 
+		u_color := glm.vec3{1.0, 0.0, 1.0}
+		u_gridSpacing := glm.vec2{1.0, 1.0}
+		gl.BindVertexArray(0)
+		shader_use(&shader_grid_2d)
+		shader_set_uniform_mat4(&shader_grid_2d, "u_transform", &u_transform)
+		// shader_set_uniform_vec2(&shader_grid_2d, "u_gridSpacing", &u_gridSpacing)
+		gl.DrawArrays(gl.POINTS, 0, 4)
+
+
+		gl.BindVertexArray(vao)
+		shader_use(&shader_default)
+		shader_set_uniform_mat4(&shader_default, "u_transform", &u_transform)
 		gl.DrawElements(gl.TRIANGLES, i32(len(indices)), gl.UNSIGNED_SHORT, nil)
 
 		SDL.GL_SwapWindow(window)
