@@ -86,7 +86,7 @@ shader_init :: proc(path: string) -> (shader: Shader) {
 		return
 	}
 
-	shaders_source := strings.split_n(string(shader_source), "#split", 2)
+	shaders_source := strings.split_n(string(shader_source), "#split", 3)
 
 	shader_program_id, shader_program_ok := gl.load_shaders_source(
 		shaders_source[0],
@@ -237,64 +237,111 @@ main :: proc() {
 
 	gl_context := SDL.GL_CreateContext(window)
 	SDL.GL_MakeCurrent(window, gl_context)
-	// load the OpenGL procedures once an OpenGL context has been established
 	gl.load_up_to(4, 6, SDL.gl_set_proc_address)
 
-	camera_orbit: Camera_Orbit
-	camera_inst := camera_init(camera_orbit)
+	// OPENGL_BEGIN
+	shader_source, shaders_source_ok := os.read_entire_file("resources/shaders/default.glsl")
+	shaders_source := strings.split(string(shader_source), "#split")
 
-	quad_mesh: Mesh
-	quad_mesh.vertices = []Vertex {
-		 {
-			position = {-0.5, +0.5, 0},
-			normal = {0.0, 0.0, 0.0},
-			color = {1.0, 0.0, 0.0, 1.0},
-			uv = {0.0, 0.0},
-		},
-		 {
-			position = {-0.5, -0.5, 0},
-			normal = {0.0, 0.0, 0.0},
-			color = {1.0, 1.0, 0.0, 1.0},
-			uv = {0.0, 0.0},
-		},
-		 {
-			position = {+0.5, -0.5, 0},
-			normal = {0.0, 0.0, 0.0},
-			color = {0.0, 1.0, 0.0, 1.0},
-			uv = {0.0, 0.0},
-		},
-		 {
-			position = {+0.5, +0.5, 0},
-			normal = {0.0, 0.0, 0.0},
-			color = {0.0, 0.0, 1.0, 1.0},
-			uv = {0.0, 0.0},
-		},
+	vertex_shader_id := gl_compile_shader_from_source(
+		shaders_source[0],
+		gl.Shader_Type.VERTEX_SHADER,
+	);defer gl.DeleteShader(vertex_shader_id)
+
+	geometry_shader_id := gl_compile_shader_from_source(
+		shaders_source[1],
+		gl.Shader_Type.GEOMETRY_SHADER,
+	);defer gl.DeleteShader(geometry_shader_id)
+
+	fragment_shader_id := gl_compile_shader_from_source(
+		shaders_source[2],
+		gl.Shader_Type.FRAGMENT_SHADER,
+	);defer gl.DeleteShader(fragment_shader_id)
+
+	shader_program_id := gl_create_and_link_program(
+		[]u32{vertex_shader_id, geometry_shader_id, fragment_shader_id},
+		false,
+	)
+
+	gl.UseProgram(shader_program_id)
+
+	// assert(false)
+
+	vao: u32
+	gl.GenVertexArrays(1, &vao);defer gl.DeleteVertexArrays(1, &vao)
+
+	// initialization of OpenGL buffers
+	vbo, ebo: u32
+	gl.GenBuffers(1, &vbo);defer gl.DeleteBuffers(1, &vbo)
+	gl.GenBuffers(1, &ebo);defer gl.DeleteBuffers(1, &ebo)
+
+	// struct declaration
+	Vertex :: struct {
+		pos: glm.vec3,
+		col: glm.vec4,
 	}
-	quad_mesh.indices = []u16{0, 1, 2, 2, 3, 0}
 
-	quad_shader := shader_init("resources/shaders/default.glsl")
-	// shader_update_data(&quad_shader, &quad_mesh)
+	vertices := []Vertex {
+		{{-0.5, +0.5, 0}, {1.0, 0.0, 0.0, 0.75}},
+		{{-0.5, -0.5, 0}, {1.0, 1.0, 0.0, 0.75}},
+		{{+0.5, -0.5, 0}, {0.0, 1.0, 0.0, 0.75}},
+		{{+0.5, +0.5, 0}, {0.0, 0.0, 1.0, 0.75}},
+	}
 
-	// high precision timer
+	indices := []u16{0, 1, 2, 2, 3, 0}
+
+	// Craete empty vertex buffer
+	gl.BindBuffer(gl.ARRAY_BUFFER, vbo)
+
+	// Update vertex buffer
+	gl.BufferData(
+		gl.ARRAY_BUFFER,
+		len(vertices) * size_of(vertices[0]),
+		raw_data(vertices),
+		gl.DYNAMIC_DRAW,
+	)
+	// gl.BufferSubData(gl.ARRAY_BUFFER, 0, len(vertices) * size_of(vertices[0]), raw_data(vertices))
+
+	gl.EnableVertexAttribArray(0)
+	gl.EnableVertexAttribArray(1)
+	gl.VertexAttribPointer(0, 3, gl.FLOAT, false, size_of(Vertex), offset_of(Vertex, pos))
+	gl.VertexAttribPointer(1, 4, gl.FLOAT, false, size_of(Vertex), offset_of(Vertex, col))
+
+	// Craete empty index buffer
+	gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, ebo)
+
+	// Update index buffer
+	gl.BufferData(
+		gl.ELEMENT_ARRAY_BUFFER,
+		len(indices) * size_of(indices[0]),
+		raw_data(indices),
+		gl.DYNAMIC_DRAW,
+	)
+	// gl.BufferSubData(
+	// 	gl.ELEMENT_ARRAY_BUFFER,
+	// 	0,
+	// 	len(indices) * size_of(indices[0]),
+	// 	raw_data(indices),
+	// )
+
+	uniforms := gl.get_uniforms_from_program(shader_program_id);defer delete(uniforms)
+	// OPENGL_END
+
 	start_tick := time.tick_now()
 
 	loop: for {
 		duration := time.tick_since(start_tick)
 		t := f32(time.duration_seconds(duration))
 
-		// event polling
 		event: SDL.Event
 		for SDL.PollEvent(&event) {
-			// #partial switch tells the compiler not to error if every case is not present
 			#partial switch event.type {
 			case .KEYDOWN:
 				#partial switch event.key.keysym.sym {
 				case .ESCAPE:
-					// labelled control flow
 					break loop
 				}
 			case .QUIT:
-				// labelled control flow
 				break loop
 			}
 
@@ -307,21 +354,52 @@ main :: proc() {
 			}
 		}
 
-		pre_draw()
-		{
-			camera_update(&camera_inst.variant.(Camera_Base), &quad_shader)
-			// draw(&quad_mesh)
-		}
-		present(window)
+		// Native support for GLSL-like functionality
+		pos := glm.vec3{glm.cos(t * 2), glm.sin(t * 2), 0}
+
+		// array programming support
+		pos *= 0.3
+
+		// matrix support
+		// model matrix which a default scale of 0.5
+		model := glm.mat4{0.5, 0, 0, 0, 0, 0.5, 0, 0, 0, 0, 0.5, 0, 0, 0, 0, 1}
+
+		// matrix indexing and array short with `.x`
+		model[0, 3] = -pos.x
+		model[1, 3] = -pos.y
+		model[2, 3] = -pos.z
+
+		// native swizzling support for arrays
+		model[3].yzx = pos.yzx
+
+		model = model * glm.mat4Rotate({0, 1, 1}, t)
+
+		view := glm.mat4LookAt({0, -1, +1}, {0, 0, 0}, {0, 0, 1})
+		proj := glm.mat4Perspective(45, 1.3, 0.1, 100.0)
+
+		// matrix multiplication
+		u_transform := proj * view * model
+
+		// matrix types in Odin are stored in column-major format but written as you'd normal write them
+		gl.UniformMatrix4fv(uniforms["u_transform"].location, 1, false, &u_transform[0, 0])
+
+		gl.Viewport(0, 0, auto_cast WINDOW_WIDTH, auto_cast WINDOW_HEIGHT)
+		gl.ClearColor(0.5, 0.7, 1.0, 1.0)
+		gl.Clear(gl.COLOR_BUFFER_BIT)
+
+		gl.DrawElements(gl.TRIANGLES, i32(len(indices)), gl.UNSIGNED_SHORT, nil)
+
+		SDL.GL_SwapWindow(window)
 	}
 }
 
+// Compiling shaders are identical for any shader (vertex, geometry, fragment, tesselation, (maybe compute too))
+@(private)
 gl_compile_shader_from_source :: proc(
 	shader_data: string,
 	shader_type: gl.Shader_Type,
 ) -> (
 	shader_id: u32,
-	ok: bool,
 ) {
 	shader_id = gl.CreateShader(cast(u32)shader_type)
 	length := i32(len(shader_data))
@@ -329,17 +407,16 @@ gl_compile_shader_from_source :: proc(
 	gl.ShaderSource(shader_id, 1, &shader_data_copy, &length)
 	gl.CompileShader(shader_id)
 
-	// gl.check_error(shader_id, shader_type, COMPILE_STATUS, GetShaderiv, GetShaderInfoLog) or_return
-	ok = true
 	return
 }
 
+// only used once, but I'd just make a subprocedure(?) for consistency
+@(private)
 gl_create_and_link_program :: proc(
 	shader_ids: []u32,
 	binary_retrievable := false,
 ) -> (
 	program_id: u32,
-	ok: bool,
 ) {
 	program_id = gl.CreateProgram()
 	for id in shader_ids {
@@ -355,13 +432,5 @@ gl_create_and_link_program :: proc(
 	}
 	gl.LinkProgram(program_id)
 
-	// check_error(
-	// 	program_id,
-	// 	Shader_Type.SHADER_LINK,
-	// 	LINK_STATUS,
-	// 	GetProgramiv,
-	// 	GetProgramInfoLog,
-	// ) or_return
-	ok = true
 	return
 }
