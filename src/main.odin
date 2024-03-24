@@ -80,41 +80,28 @@ shader_init :: proc(path: string) -> (shader: Shader) {
 	vao, vbo, ebo: u32
 	shader_ids: [3]u32
 
-	shader_source, shader_source_ok := os.read_entire_file(path)
-	if !shader_source_ok {
-		fmt.eprintln("Failed to create GLSL program")
-		return
-	}
+	shader_source, shaders_source_ok := os.read_entire_file("resources/shaders/default.glsl")
+	shaders_source := strings.split(string(shader_source), "#split")
 
-	shaders_source := strings.split_n(string(shader_source), "#split", 3)
-
-	shader_program_id, shader_program_ok := gl.load_shaders_source(
+	vertex_shader_id := gl_compile_shader_from_source(
 		shaders_source[0],
+		gl.Shader_Type.VERTEX_SHADER,
+	);defer gl.DeleteShader(vertex_shader_id)
+
+	geometry_shader_id := gl_compile_shader_from_source(
 		shaders_source[1],
+		gl.Shader_Type.GEOMETRY_SHADER,
+	);defer gl.DeleteShader(geometry_shader_id)
+
+	fragment_shader_id := gl_compile_shader_from_source(
+		shaders_source[2],
+		gl.Shader_Type.FRAGMENT_SHADER,
+	);defer gl.DeleteShader(fragment_shader_id)
+
+	shader_program_id := gl_create_and_link_program(
+		[]u32{vertex_shader_id, geometry_shader_id, fragment_shader_id},
+		false,
 	)
-
-	when false {
-		vertex_shader_id, vertex_shader_ok := gl_compile_shader_from_source(
-			shaders_source[0],
-			gl.Shader_Type.VERTEX_SHADER,
-		);defer gl.DeleteShader(vertex_shader_id)
-		shader_ids[0] = vertex_shader_id
-
-		fragment_shader_id, fragment_shader_ok := gl_compile_shader_from_source(
-			shaders_source[1],
-			gl.Shader_Type.FRAGMENT_SHADER,
-		);defer gl.DeleteShader(fragment_shader_id)
-		shader_ids[1] = fragment_shader_id
-
-		if len(shaders_source) == 3 {
-			geometry_shader_id, geometry_shader_ok := gl_compile_shader_from_source(
-				shaders_source[2],
-				gl.Shader_Type.GEOMETRY_SHADER,
-			);defer gl.DeleteShader(geometry_shader_id)
-			shader_ids[2] = geometry_shader_id
-		}
-		shader_program_id, shader_program_ok := gl_create_and_link_program(shader_ids[0:2])
-	}
 
 	gl.UseProgram(shader_program_id)
 
@@ -222,7 +209,7 @@ camera_get_view_matrix :: proc(camera: ^Camera_Base) -> glm.mat4 {
 
 main :: proc() {
 	window := SDL.CreateWindow(
-	"Odin SDL2 Demo",
+	"Skat3D",
 	SDL.WINDOWPOS_UNDEFINED,
 	SDL.WINDOWPOS_UNDEFINED,
 	auto_cast WINDOW_WIDTH,
@@ -275,17 +262,31 @@ main :: proc() {
 	gl.GenBuffers(1, &vbo);defer gl.DeleteBuffers(1, &vbo)
 	gl.GenBuffers(1, &ebo);defer gl.DeleteBuffers(1, &ebo)
 
-	// struct declaration
-	Vertex :: struct {
-		pos: glm.vec3,
-		col: glm.vec4,
-	}
-
 	vertices := []Vertex {
-		{{-0.5, +0.5, 0}, {1.0, 0.0, 0.0, 0.75}},
-		{{-0.5, -0.5, 0}, {1.0, 1.0, 0.0, 0.75}},
-		{{+0.5, -0.5, 0}, {0.0, 1.0, 0.0, 0.75}},
-		{{+0.5, +0.5, 0}, {0.0, 0.0, 1.0, 0.75}},
+		 {
+			position = {-0.5, +0.5, 0},
+			normal = {0.0, 0.0, 0.0},
+			color = {1.0, 0.0, 0.0, 0.75},
+			uv = {0.0, 0.0},
+		},
+		 {
+			position = {-0.5, -0.5, 0},
+			normal = {0.0, 0.0, 0.0},
+			color = {1.0, 1.0, 0.0, 0.75},
+			uv = {0.0, 0.0},
+		},
+		 {
+			position = {+0.5, -0.5, 0},
+			normal = {0.0, 0.0, 0.0},
+			color = {0.0, 1.0, 0.0, 0.75},
+			uv = {0.0, 0.0},
+		},
+		 {
+			position = {+0.5, +0.5, 0},
+			normal = {0.0, 0.0, 0.0},
+			color = {0.0, 0.0, 1.0, 0.75},
+			uv = {0.0, 0.0},
+		},
 	}
 
 	indices := []u16{0, 1, 2, 2, 3, 0}
@@ -304,8 +305,12 @@ main :: proc() {
 
 	gl.EnableVertexAttribArray(0)
 	gl.EnableVertexAttribArray(1)
-	gl.VertexAttribPointer(0, 3, gl.FLOAT, false, size_of(Vertex), offset_of(Vertex, pos))
-	gl.VertexAttribPointer(1, 4, gl.FLOAT, false, size_of(Vertex), offset_of(Vertex, col))
+	gl.EnableVertexAttribArray(2)
+	gl.EnableVertexAttribArray(3)
+	gl.VertexAttribPointer(0, 3, gl.FLOAT, false, size_of(Vertex), offset_of(Vertex, position))
+	gl.VertexAttribPointer(1, 3, gl.FLOAT, false, size_of(Vertex), offset_of(Vertex, normal))
+	gl.VertexAttribPointer(2, 4, gl.FLOAT, false, size_of(Vertex), offset_of(Vertex, color))
+	gl.VertexAttribPointer(3, 2, gl.FLOAT, false, size_of(Vertex), offset_of(Vertex, uv))
 
 	// Craete empty index buffer
 	gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, ebo)
