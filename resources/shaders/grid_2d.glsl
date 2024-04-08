@@ -1,3 +1,4 @@
+#vertex
 #version 460 core
 
 layout(location = 0) in vec3 a_position;
@@ -9,33 +10,25 @@ void main() {
     gl_Position = u_transform * vec4(a_position, 1.0);
 }
 
-#split
-
+#geometry
 #version 460 core
-// #extension GL_EXT_geometry_shader4 : enable
 
 layout(points) in;
 layout(triangle_strip, max_vertices = 4) out;
 
 void main() {
-    // Создаем четырехугольник из одной точки
-    gl_Position = gl_in[0].gl_Position + vec4(-0.5, -0.5, 0.0, 0.0); // Нижняя левая вершина
+    gl_Position = gl_in[0].gl_Position + vec4(-0.5, -0.5, 0.0, 0.0);
     EmitVertex();
-
-    gl_Position = gl_in[0].gl_Position + vec4(0.5, -0.5, 0.0, 0.0); // Нижняя правая вершина
+    gl_Position = gl_in[0].gl_Position + vec4(0.5, -0.5, 0.0, 0.0);
     EmitVertex();
-
-    gl_Position = gl_in[0].gl_Position + vec4(-0.5, 0.5, 0.0, 0.0); // Верхняя левая вершина
+    gl_Position = gl_in[0].gl_Position + vec4(-0.5, 0.5, 0.0, 0.0);
     EmitVertex();
-
-    gl_Position = gl_in[0].gl_Position + vec4(0.5, 0.5, 0.0, 0.0); // Верхняя правая вершина
+    gl_Position = gl_in[0].gl_Position + vec4(0.5, 0.5, 0.0, 0.0);
     EmitVertex();
-
     EndPrimitive();
 }
 
-#split
-
+#fragment
 #version 460 core
 
 layout(location = 0) out vec4 outColor;

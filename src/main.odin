@@ -77,34 +77,67 @@ present :: proc(window: ^SDL.Window) {
 
 shader_init :: proc(path: string) -> (shader: Shader) {
 	shader_source, shaders_source_ok := os.read_entire_file(path)
-	shaders_source := strings.split(string(shader_source), "#split")
-	shaders_id: [3]u32
+	shaders_id: [dynamic]u32;defer delete(shaders_id)
 
-	shaders_id[0] = gl_compile_shader_from_source(
-		shaders_source[0],
-		gl.Shader_Type.VERTEX_SHADER,
-	);defer gl.DeleteShader(shaders_id[0])
+	vertex_shader_source, vertex_shader_found := shader_get_program(
+		string(shader_source),
+		"#vertex",
+	)
+	// if vertex_shader_found {
+	// 	shader_id := gl_compile_shader_from_source(
+	// 		vertex_shader_source,
+	// 		gl.Shader_Type.VERTEX_SHADER,
+	// 	)
+	// 	append(&shaders_id, shader_id)
+	// }
+	//
+	// geometry_shader_source, geometry_shader_found := shader_get_program(
+	// 	string(shader_source),
+	// 	"#geometry",
+	// )
+	// if vertex_shader_found {
+	// 	shader_id := gl_compile_shader_from_source(
+	// 		geometry_shader_source,
+	// 		gl.Shader_Type.GEOMETRY_SHADER,
+	// 	)
+	// 	append(&shaders_id, shader_id)
+	// }
+	//
+	// fragment_shader_source, fragment_shader_found := shader_get_program(
+	// 	string(shader_source),
+	// 	"#fragment",
+	// )
+	// if fragment_shader_found {
+	// 	shader_id := gl_compile_shader_from_source(
+	// 		fragment_shader_source,
+	// 		gl.Shader_Type.FRAGMENT_SHADER,
+	// 	)
+	// 	append(&shaders_id, shader_id)
+	// }
 
-	if len(shaders_source) == 3 {
-		shaders_id[1] = gl_compile_shader_from_source(
-			shaders_source[1],
-			gl.Shader_Type.GEOMETRY_SHADER,
-		)
-	};defer gl.DeleteShader(shaders_id[1])
+	shader.id = gl_create_and_link_program(shaders_id[:], false)
 
-	shaders_id[2] = gl_compile_shader_from_source(
-		shaders_source[len(shaders_source) - 1],
-		gl.Shader_Type.FRAGMENT_SHADER,
-	);defer gl.DeleteShader(shaders_id[2])
-
-	if len(shaders_source) == 3 {
-		shader.id = gl_create_and_link_program(
-			[]u32{shaders_id[0], shaders_id[1], shaders_id[2]},
-			false,
-		)
-	} else {
-		shader.id = gl_create_and_link_program([]u32{shaders_id[0], shaders_id[2]}, false)
+	for id, i in shaders_id {
+		gl.DeleteShader(id)
 	}
+
+	return
+}
+
+find_by_pattern :: proc(
+	data: string,
+	pattern_begin, pattern_end: string,
+) -> (
+	begin: int,
+	end: int,
+) {
+	return
+}
+
+shader_get_program :: proc(data: string, pattern: string) -> (res: string, ok: bool) {
+	begin, end := find_by_pattern(data, "#vertex", "#fragment")
+	fmt.println(begin, end)
+	fmt.println(string(data[begin:end]))
 
 	return
 }
@@ -186,7 +219,7 @@ main :: proc() {
 
 	// OPENGL_BEGIN
 	shader_default := shader_init("resources/shaders/default.glsl")
-	shader_grid_2d := shader_init("resources/shaders/grid_2d.glsl")
+	// shader_grid_2d := shader_init("resources/shaders/grid_2d.glsl")
 
 	vertices := []Vertex {
 		 {
@@ -322,19 +355,19 @@ main :: proc() {
 		gl.ClearColor(0.5, 0.7, 1.0, 1.0)
 		gl.Clear(gl.COLOR_BUFFER_BIT)
 
-		u_color := glm.vec3{1.0, 0.0, 1.0}
-		u_gridSpacing := glm.vec2{1.0, 1.0}
-		gl.BindVertexArray(0)
-		shader_use(&shader_grid_2d)
-		shader_set_uniform_mat4(&shader_grid_2d, "u_transform", &u_transform)
+		// u_color := glm.vec3{1.0, 0.0, 1.0}
+		// u_gridSpacing := glm.vec2{1.0, 1.0}
+		// gl.BindVertexArray(0)
+		// shader_use(&shader_grid_2d)
+		// shader_set_uniform_mat4(&shader_grid_2d, "u_transform", &u_transform)
 		// shader_set_uniform_vec2(&shader_grid_2d, "u_gridSpacing", &u_gridSpacing)
-		gl.DrawArrays(gl.POINTS, 0, 4)
+		// gl.DrawArrays(gl.POINTS, 0, 4)
 
 
-		gl.BindVertexArray(vao)
-		shader_use(&shader_default)
-		shader_set_uniform_mat4(&shader_default, "u_transform", &u_transform)
-		gl.DrawElements(gl.TRIANGLES, i32(len(indices)), gl.UNSIGNED_SHORT, nil)
+		// gl.BindVertexArray(vao)
+		// shader_use(&shader_default)
+		// shader_set_uniform_mat4(&shader_default, "u_transform", &u_transform)
+		// gl.DrawElements(gl.TRIANGLES, i32(len(indices)), gl.UNSIGNED_SHORT, nil)
 
 		SDL.GL_SwapWindow(window)
 	}
