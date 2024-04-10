@@ -3,6 +3,7 @@ package skat3d
 import "core:fmt"
 import glm "core:math/linalg/glsl"
 import "core:os"
+import "core:path/filepath"
 import "core:strings"
 import "core:time"
 
@@ -76,44 +77,45 @@ present :: proc(window: ^SDL.Window) {
 }
 
 shader_init :: proc(path: string) -> (shader: Shader) {
-	shader_source, shaders_source_ok := os.read_entire_file(path)
 	shaders_id: [dynamic]u32;defer delete(shaders_id)
 
-	vertex_shader_source, vertex_shader_found := shader_get_program(
-		string(shader_source),
-		"#vertex",
+	vertex_shader_source, vertex_shader_ok := os.read_entire_file(
+		strings.join({path, "vs.glsl"}, "/"),
 	)
-	// if vertex_shader_found {
-	// 	shader_id := gl_compile_shader_from_source(
-	// 		vertex_shader_source,
-	// 		gl.Shader_Type.VERTEX_SHADER,
-	// 	)
-	// 	append(&shaders_id, shader_id)
-	// }
-	//
-	// geometry_shader_source, geometry_shader_found := shader_get_program(
-	// 	string(shader_source),
-	// 	"#geometry",
-	// )
-	// if vertex_shader_found {
-	// 	shader_id := gl_compile_shader_from_source(
-	// 		geometry_shader_source,
-	// 		gl.Shader_Type.GEOMETRY_SHADER,
-	// 	)
-	// 	append(&shaders_id, shader_id)
-	// }
-	//
-	// fragment_shader_source, fragment_shader_found := shader_get_program(
-	// 	string(shader_source),
-	// 	"#fragment",
-	// )
-	// if fragment_shader_found {
-	// 	shader_id := gl_compile_shader_from_source(
-	// 		fragment_shader_source,
-	// 		gl.Shader_Type.FRAGMENT_SHADER,
-	// 	)
-	// 	append(&shaders_id, shader_id)
-	// }
+	if !vertex_shader_ok do panic("File not found")
+	{
+		shader_id := gl_compile_shader_from_source(
+			string(vertex_shader_source),
+			gl.Shader_Type.VERTEX_SHADER,
+		)
+		append(&shaders_id, shader_id)
+	}
+	// fmt.println(string(vertex_shader_source))
+
+	geometry_shader_source, geometry_shader_ok := os.read_entire_file(
+		strings.join({path, "gs.glsl"}, "/"),
+	)
+	if geometry_shader_ok {
+		shader_id := gl_compile_shader_from_source(
+			string(geometry_shader_source),
+			gl.Shader_Type.GEOMETRY_SHADER,
+		)
+		append(&shaders_id, shader_id)
+		// fmt.println(string(geometry_shader_source))
+	}
+
+	fragment_shader_source, fragment_shader_ok := os.read_entire_file(
+		strings.join({path, "fs.glsl"}, "/"),
+	)
+	if !fragment_shader_ok do panic("File not found")
+	{
+		shader_id := gl_compile_shader_from_source(
+			string(fragment_shader_source),
+			gl.Shader_Type.FRAGMENT_SHADER,
+		)
+		append(&shaders_id, shader_id)
+	}
+	// fmt.println(string(fragment_shader_source))
 
 	shader.id = gl_create_and_link_program(shaders_id[:], false)
 
@@ -131,14 +133,6 @@ find_by_pattern :: proc(
 	begin: int,
 	end: int,
 ) {
-	return
-}
-
-shader_get_program :: proc(data: string, pattern: string) -> (res: string, ok: bool) {
-	begin, end := find_by_pattern(data, "#vertex", "#fragment")
-	fmt.println(begin, end)
-	fmt.println(string(data[begin:end]))
-
 	return
 }
 
@@ -218,8 +212,7 @@ main :: proc() {
 	gl.load_up_to(4, 6, SDL.gl_set_proc_address)
 
 	// OPENGL_BEGIN
-	shader_default := shader_init("resources/shaders/default.glsl")
-	// shader_grid_2d := shader_init("resources/shaders/grid_2d.glsl")
+	shader_default := shader_init("resources/shaders/default")
 
 	vertices := []Vertex {
 		 {
@@ -364,10 +357,10 @@ main :: proc() {
 		// gl.DrawArrays(gl.POINTS, 0, 4)
 
 
-		// gl.BindVertexArray(vao)
-		// shader_use(&shader_default)
-		// shader_set_uniform_mat4(&shader_default, "u_transform", &u_transform)
-		// gl.DrawElements(gl.TRIANGLES, i32(len(indices)), gl.UNSIGNED_SHORT, nil)
+		gl.BindVertexArray(vao)
+		shader_use(&shader_default)
+		shader_set_uniform_mat4(&shader_default, "u_transform", &u_transform)
+		gl.DrawElements(gl.TRIANGLES, i32(len(indices)), gl.UNSIGNED_SHORT, nil)
 
 		SDL.GL_SwapWindow(window)
 	}

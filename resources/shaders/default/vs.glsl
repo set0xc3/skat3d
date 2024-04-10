@@ -1,0 +1,14 @@
+#version 460 core
+
+layout(location = 0) in vec3 a_position;
+layout(location = 2) in vec4 a_color;
+
+uniform mat4 u_transform;
+
+out vec4 v_color;
+
+void main()
+{
+    v_color = a_color;
+    gl_Position = u_transform * vec4(a_position, 1.0);
+}
