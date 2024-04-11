@@ -239,8 +239,8 @@ camera_update :: proc(camera: ^Camera_Base, shader: ^Shader) {
 		camera.near,
 		camera.far,
 	)
+
 	shader_use(shader)
-	shader_set_uniform_mat4(shader, "u_model", &model)
 	shader_set_uniform_mat4(shader, "u_view", &view)
 	shader_set_uniform_mat4(shader, "u_projection", &projection)
 }
@@ -267,6 +267,8 @@ main :: proc() {
 	gl_context := SDL.GL_CreateContext(window)
 	SDL.GL_MakeCurrent(window, gl_context)
 	gl.load_up_to(4, 6, SDL.gl_set_proc_address)
+
+	gl.Enable(gl.DEPTH_TEST)
 
 	shader_default := shader_init("resources/shaders/default")
 
@@ -300,6 +302,8 @@ main :: proc() {
 		[]u16{0, 1, 2, 2, 3, 0},
 	)
 
+	camera_var: Camera_Base
+	camera := camera_init(camera_var)
 
 	start_tick := time.tick_now()
 
@@ -328,47 +332,26 @@ main :: proc() {
 			}
 		}
 
-		// Native support for GLSL-like functionality
-		pos := glm.vec3{glm.cos(t * 2), glm.sin(t * 2), 0}
-
-		// array programming support
-		pos *= 0.3
-
-		// matrix support
-		// model matrix which a default scale of 0.5
-		model := glm.mat4{0.5, 0, 0, 0, 0, 0.5, 0, 0, 0, 0, 0.5, 0, 0, 0, 0, 1}
-
-		// matrix indexing and array short with `.x`
-		model[0, 3] = -pos.x
-		model[1, 3] = -pos.y
-		model[2, 3] = -pos.z
-
-		// native swizzling support for arrays
-		model[3].yzx = pos.yzx
-
-		model = model * glm.mat4Rotate({0, 1, 1}, t)
-
-		view := glm.mat4LookAt({0, -1, +1}, {0, 0, 0}, {0, 0, 1})
-		proj := glm.mat4Perspective(45, 1.3, 0.1, 100.0)
-
-		// matrix multiplication
-		u_transform := proj * view * model
-
 		gl.Viewport(0, 0, auto_cast WINDOW_WIDTH, auto_cast WINDOW_HEIGHT)
 		gl.ClearColor(0.5, 0.7, 1.0, 1.0)
-		gl.Clear(gl.COLOR_BUFFER_BIT)
-
-		// u_color := glm.vec3{1.0, 0.0, 1.0}
-		// u_gridSpacing := glm.vec2{1.0, 1.0}
-		// gl.BindVertexArray(0)
-		// shader_use(&shader_grid_2d)
-		// shader_set_uniform_mat4(&shader_grid_2d, "u_transform", &u_transform)
-		// shader_set_uniform_vec2(&shader_grid_2d, "u_gridSpacing", &u_gridSpacing)
-		// gl.DrawArrays(gl.POINTS, 0, 4)
-
+		gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
 		shader_use(&shader_default)
-		shader_set_uniform_mat4(&shader_default, "u_transform", &u_transform)
+
+		#partial switch &camera in camera.variant {
+		case Camera_Base:
+			camera.position.y += 0.01
+			camera_update(&camera, &shader_default)
+		case Camera_Orbit:
+			camera_update(&camera, &shader_default)
+		}
+
+		@(static)
+		object_position: glm.vec3
+		object_position.x += 0.01
+		object_model := glm.identity(glm.mat4)
+		object_model = glm.mat4Translate({object_position.x, 0.0, 0.0})
+		shader_set_uniform_mat4(&shader_default, "u_model", &object_model)
 
 		gl.BindVertexArray(test_mesh.vao)
 		gl.DrawElements(gl.TRIANGLES, i32(len(test_mesh.indices)), gl.UNSIGNED_SHORT, nil)
