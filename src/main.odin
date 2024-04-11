@@ -28,13 +28,24 @@ Shader :: struct {
 	path: string,
 }
 
-Sprite :: struct {
-	id: UUID4,
+Transform :: struct {
+	is_dirty: bool,
+	position: glm.vec3,
+	rotation: glm.vec3,
+	size:     glm.vec3,
+}
+
+World_Object :: struct {
+	id:        UUID4,
+	name:      string,
+	transform: Transform,
+	mesh:      Mesh,
 }
 
 Mesh :: struct {
-	vertices: []Vertex,
-	indices:  []u16,
+	vao, vbo, ebo: u32,
+	vertices:      []Vertex,
+	indices:       []u16,
 }
 
 Camera_Base :: struct {
@@ -130,14 +141,56 @@ shader_init :: proc(path: string) -> (shader: Shader) {
 	return
 }
 
-find_by_pattern :: proc(
-	data: string,
-	pattern_begin, pattern_end: string,
-) -> (
-	begin: int,
-	end: int,
-) {
-	return
+gl_init :: proc() {
+	// initialization of OpenGL buffers
+	vao, vbo, ebo: u32
+	gl.GenVertexArrays(1, &vao)
+	gl.GenBuffers(1, &vbo)
+	gl.GenBuffers(1, &ebo)
+
+	gl.BindVertexArray(vao)
+
+	// Craete empty vertex buffer
+	// gl.BindBuffer(gl.ARRAY_BUFFER, vbo)
+	// gl.BufferData(gl.ARRAY_BUFFER, 0, nil, gl.DYNAMIC_DRAW)
+
+	// Update vertex buffer
+	// gl.BufferData(
+	// 	gl.ARRAY_BUFFER,
+	// 	len(vertices) * size_of(vertices[0]),
+	// 	raw_data(vertices),
+	// 	gl.DYNAMIC_DRAW,
+	// )
+	// gl.BufferSubData(gl.ARRAY_BUFFER, 0, len(vertices) * size_of(vertices[0]), raw_data(vertices))
+
+	gl.EnableVertexAttribArray(0)
+	gl.EnableVertexAttribArray(1)
+	gl.EnableVertexAttribArray(2)
+	gl.EnableVertexAttribArray(3)
+	gl.VertexAttribPointer(0, 3, gl.FLOAT, false, size_of(Vertex), offset_of(Vertex, position))
+	gl.VertexAttribPointer(1, 3, gl.FLOAT, false, size_of(Vertex), offset_of(Vertex, normal))
+	gl.VertexAttribPointer(2, 4, gl.FLOAT, false, size_of(Vertex), offset_of(Vertex, color))
+	gl.VertexAttribPointer(3, 2, gl.FLOAT, false, size_of(Vertex), offset_of(Vertex, uv))
+
+	// Craete empty index buffer
+	// gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, ebo)
+	// gl.BufferData(gl.ELEMENT_ARRAY_BUFFER, 0, nil, gl.DYNAMIC_DRAW)
+
+	// Update index buffer
+	// gl.BufferData(
+	// 	gl.ELEMENT_ARRAY_BUFFER,
+	// 	len(indices) * size_of(indices[0]),
+	// 	raw_data(indices),
+	// 	gl.DYNAMIC_DRAW,
+	// )
+	// gl.BufferSubData(
+	// 	gl.ELEMENT_ARRAY_BUFFER,
+	// 	0,
+	// 	len(indices) * size_of(indices[0]),
+	// 	raw_data(indices),
+	// )
+
+	gl.BindVertexArray(0)
 }
 
 shader_use :: proc(shader: ^Shader) {
@@ -215,85 +268,38 @@ main :: proc() {
 	SDL.GL_MakeCurrent(window, gl_context)
 	gl.load_up_to(4, 6, SDL.gl_set_proc_address)
 
-	// OPENGL_BEGIN
 	shader_default := shader_init("resources/shaders/default")
 
-	vertices := []Vertex {
-		 {
-			position = {-0.5, +0.5, 0},
-			normal = {0.0, 0.0, 0.0},
-			color = {1.0, 0.0, 0.0, 0.75},
-			uv = {0.0, 0.0},
+	test_mesh := mesh_create(
+		[]Vertex {
+			 {
+				position = {-0.5, +0.5, 0},
+				normal = {0.0, 0.0, 0.0},
+				color = {1.0, 0.0, 0.0, 0.75},
+				uv = {0.0, 0.0},
+			},
+			 {
+				position = {-0.5, -0.5, 0},
+				normal = {0.0, 0.0, 0.0},
+				color = {1.0, 1.0, 0.0, 0.75},
+				uv = {0.0, 0.0},
+			},
+			 {
+				position = {+0.5, -0.5, 0},
+				normal = {0.0, 0.0, 0.0},
+				color = {0.0, 1.0, 0.0, 0.75},
+				uv = {0.0, 0.0},
+			},
+			 {
+				position = {+0.5, +0.5, 0},
+				normal = {0.0, 0.0, 0.0},
+				color = {0.0, 0.0, 1.0, 0.75},
+				uv = {0.0, 0.0},
+			},
 		},
-		 {
-			position = {-0.5, -0.5, 0},
-			normal = {0.0, 0.0, 0.0},
-			color = {1.0, 1.0, 0.0, 0.75},
-			uv = {0.0, 0.0},
-		},
-		 {
-			position = {+0.5, -0.5, 0},
-			normal = {0.0, 0.0, 0.0},
-			color = {0.0, 1.0, 0.0, 0.75},
-			uv = {0.0, 0.0},
-		},
-		 {
-			position = {+0.5, +0.5, 0},
-			normal = {0.0, 0.0, 0.0},
-			color = {0.0, 0.0, 1.0, 0.75},
-			uv = {0.0, 0.0},
-		},
-	}
-
-	indices := []u16{0, 1, 2, 2, 3, 0}
-
-	// initialization of OpenGL buffers
-	vao, vbo, ebo: u32
-	gl.GenVertexArrays(1, &vao);defer gl.DeleteVertexArrays(1, &vao)
-	gl.GenBuffers(1, &vbo);defer gl.DeleteBuffers(1, &vbo)
-	gl.GenBuffers(1, &ebo);defer gl.DeleteBuffers(1, &ebo)
-
-	gl.BindVertexArray(vao)
-
-	// Craete empty vertex buffer
-	gl.BindBuffer(gl.ARRAY_BUFFER, vbo)
-
-	// Update vertex buffer
-	gl.BufferData(
-		gl.ARRAY_BUFFER,
-		len(vertices) * size_of(vertices[0]),
-		raw_data(vertices),
-		gl.DYNAMIC_DRAW,
+		[]u16{0, 1, 2, 2, 3, 0},
 	)
-	// gl.BufferSubData(gl.ARRAY_BUFFER, 0, len(vertices) * size_of(vertices[0]), raw_data(vertices))
 
-	gl.EnableVertexAttribArray(0)
-	gl.EnableVertexAttribArray(1)
-	gl.EnableVertexAttribArray(2)
-	gl.EnableVertexAttribArray(3)
-	gl.VertexAttribPointer(0, 3, gl.FLOAT, false, size_of(Vertex), offset_of(Vertex, position))
-	gl.VertexAttribPointer(1, 3, gl.FLOAT, false, size_of(Vertex), offset_of(Vertex, normal))
-	gl.VertexAttribPointer(2, 4, gl.FLOAT, false, size_of(Vertex), offset_of(Vertex, color))
-	gl.VertexAttribPointer(3, 2, gl.FLOAT, false, size_of(Vertex), offset_of(Vertex, uv))
-
-	// Craete empty index buffer
-	gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, ebo)
-
-	// Update index buffer
-	gl.BufferData(
-		gl.ELEMENT_ARRAY_BUFFER,
-		len(indices) * size_of(indices[0]),
-		raw_data(indices),
-		gl.DYNAMIC_DRAW,
-	)
-	// gl.BufferSubData(
-	// 	gl.ELEMENT_ARRAY_BUFFER,
-	// 	0,
-	// 	len(indices) * size_of(indices[0]),
-	// 	raw_data(indices),
-	// )
-
-	// OPENGL_END
 
 	start_tick := time.tick_now()
 
@@ -361,14 +367,67 @@ main :: proc() {
 		// gl.DrawArrays(gl.POINTS, 0, 4)
 
 
-		gl.BindVertexArray(vao)
 		shader_use(&shader_default)
 		shader_set_uniform_mat4(&shader_default, "u_transform", &u_transform)
-		gl.DrawElements(gl.TRIANGLES, i32(len(indices)), gl.UNSIGNED_SHORT, nil)
+
+		gl.BindVertexArray(test_mesh.vao)
+		gl.DrawElements(gl.TRIANGLES, i32(len(test_mesh.indices)), gl.UNSIGNED_SHORT, nil)
 
 		SDL.GL_SwapWindow(window)
 	}
 }
+
+// ======== Mesh ========
+
+mesh_create :: proc(vertices: []Vertex, indices: []u16) -> (mesh: Mesh) {
+	vao, vbo, ebo: u32
+
+	gl.GenVertexArrays(1, &vao)
+	gl.GenBuffers(1, &vbo)
+	gl.GenBuffers(1, &ebo)
+
+	gl.BindVertexArray(vao)
+
+	gl.BindBuffer(gl.ARRAY_BUFFER, vbo)
+	gl.BufferData(
+		gl.ARRAY_BUFFER,
+		len(vertices) * size_of(vertices[0]),
+		raw_data(vertices),
+		gl.DYNAMIC_DRAW,
+	)
+
+	// Setup only after array buffer
+	gl.EnableVertexAttribArray(0)
+	gl.EnableVertexAttribArray(1)
+	gl.EnableVertexAttribArray(2)
+	gl.EnableVertexAttribArray(3)
+	gl.VertexAttribPointer(0, 3, gl.FLOAT, false, size_of(Vertex), offset_of(Vertex, position))
+	gl.VertexAttribPointer(1, 3, gl.FLOAT, false, size_of(Vertex), offset_of(Vertex, normal))
+	gl.VertexAttribPointer(2, 4, gl.FLOAT, false, size_of(Vertex), offset_of(Vertex, color))
+	gl.VertexAttribPointer(3, 2, gl.FLOAT, false, size_of(Vertex), offset_of(Vertex, uv))
+
+	gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, ebo)
+	gl.BufferData(
+		gl.ELEMENT_ARRAY_BUFFER,
+		len(indices) * size_of(indices[0]),
+		raw_data(indices),
+		gl.DYNAMIC_DRAW,
+	)
+
+	mesh.vao, vbo, ebo = vao, vbo, ebo
+	mesh.vertices = vertices
+	mesh.indices = indices
+
+	return
+}
+
+mesh_destroy :: proc(mesh: ^Mesh) {
+	gl.DeleteVertexArrays(1, &mesh.vao)
+	gl.DeleteBuffers(1, &mesh.vbo)
+	gl.DeleteBuffers(1, &mesh.ebo)
+}
+
+// ======== Mesh ========
 
 // Compiling shaders are identical for any shader (vertex, geometry, fragment, tesselation, (maybe compute too))
 @(private)
