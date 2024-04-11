@@ -28,6 +28,10 @@ Shader :: struct {
 	path: string,
 }
 
+Sprite :: struct {
+	id: UUID4,
+}
+
 Mesh :: struct {
 	vertices: []Vertex,
 	indices:  []u16,
@@ -199,7 +203,7 @@ main :: proc() {
 	SDL.WINDOWPOS_UNDEFINED,
 	auto_cast WINDOW_WIDTH,
 	auto_cast WINDOW_HEIGHT,
-	{.RESIZABLE,  /* .FULLSCREEN, */.ALLOW_HIGHDPI, .OPENGL},
+	{.RESIZABLE,  /* .FULLSCREEN, */ /*.ALLOW_HIGHDPI,*/.OPENGL},
 	)
 	if window == nil {
 		fmt.eprintln("Failed to create window")
@@ -312,8 +316,8 @@ main :: proc() {
 			if event.window.type == .WINDOWEVENT {
 				#partial switch event.window.event {
 				case .SIZE_CHANGED, .RESIZED:
-					WINDOW_WIDTH = auto_cast event.window.data1 * 2
-					WINDOW_HEIGHT = auto_cast event.window.data2 * 2
+					WINDOW_WIDTH = auto_cast event.window.data1
+					WINDOW_HEIGHT = auto_cast event.window.data2
 				}
 			}
 		}
