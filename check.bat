@@ -1,1 +1,0 @@
-odin.exe check src -collection:skat3d=src -debug -show-timings
