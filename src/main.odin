@@ -213,19 +213,11 @@ shader_set_uniform_vec3 :: proc(shader: ^Shader, location: string, value: ^glm.v
 }
 
 camera_init :: proc(camera_var: Camera_Variable) -> (camera_inst: Camera_Instance) {
-	camera_base: Camera_Base
-	camera_base.position = {0.0, 0.0, 3.0}
-	camera_base.up = {0.0, 1.0, 0.0}
-	camera_base.front = {0.0, 0.0, -1.0}
-	camera_base.fovy = 50
-	camera_base.near = 0.1
-	camera_base.far = 100.0
-	camera_inst.variant = camera_base
-
-
 	#partial switch &camera in camera_var {
 	case Camera_Base:
+		camera_inst.variant = camera
 	case Camera_Orbit:
+		camera_inst.variant = camera
 	}
 	return
 }
@@ -302,8 +294,16 @@ main :: proc() {
 		[]u16{0, 1, 2, 2, 3, 0},
 	)
 
-	camera_var: Camera_Base
-	camera := camera_init(camera_var)
+	camera := camera_init(
+		Camera_Base {
+			position = {0.0, 0.0, 3.0},
+			up = {0.0, 1.0, 0.0},
+			front = {0.0, 0.0, -1.0},
+			fovy = 50,
+			near = 0.1,
+			far = 100.0,
+		},
+	)
 
 	start_tick := time.tick_now()
 
@@ -340,7 +340,7 @@ main :: proc() {
 
 		#partial switch &camera in camera.variant {
 		case Camera_Base:
-			camera.position.y += 0.01
+			// camera.position.y += 0.01
 			camera_update(&camera, &shader_default)
 		case Camera_Orbit:
 			camera_update(&camera, &shader_default)
@@ -348,7 +348,7 @@ main :: proc() {
 
 		@(static)
 		object_position: glm.vec3
-		object_position.x += 0.01
+		// object_position.x += 0.01
 		object_model := glm.identity(glm.mat4)
 		object_model = glm.mat4Translate({object_position.x, 0.0, 0.0})
 		shader_set_uniform_mat4(&shader_default, "u_model", &object_model)
