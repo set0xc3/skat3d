@@ -51,6 +51,10 @@ Mesh :: struct {
 Camera_Base :: struct {
 	position, front, up: glm.vec3,
 	fovy, near, far:     f32,
+	variant:             union {
+		^Camera_Base,
+		^Camera_Orbit,
+	},
 }
 
 Camera_Orbit :: struct {
@@ -60,19 +64,10 @@ Camera_Orbit :: struct {
 	radius:     f32,
 }
 
-Camera_Variable :: union {
-	Camera_Base,
-	Camera_Orbit,
-}
-
-Camera_Instance :: struct {
-	variant: Camera_Variable,
-}
-
 Context :: struct {
 	shader: Shader,
 	mesh:   Mesh,
-	camera: Camera_Base,
+	camera: ^Camera_Base,
 }
 
 ctx: Context
@@ -212,14 +207,22 @@ shader_set_uniform_vec3 :: proc(shader: ^Shader, location: string, value: ^glm.v
 	gl.Uniform3fv(uniforms[location].location, 1, &value[0])
 }
 
-camera_init :: proc(camera_var: Camera_Variable) -> (camera_inst: Camera_Instance) {
-	#partial switch &camera in camera_var {
-	case Camera_Base:
-		camera_inst.variant = camera
-	case Camera_Orbit:
-		camera_inst.variant = camera
+camera_create :: proc($T: typeid) -> ^T {
+	camera := new(T)
+	camera.variant = camera
+
+	#partial switch c in camera.variant {
+	case ^Camera_Base:
+		camera.position = {0.0, 0.0, 3.0}
+		camera.up = {0.0, 1.0, 0.0}
+		camera.front = {0.0, 0.0, -1.0}
+		camera.fovy = 50
+		camera.near = 0.1
+		camera.far = 100.0
+	case ^Camera_Orbit:
 	}
-	return
+
+	return camera
 }
 
 camera_update :: proc(camera: ^Camera_Base, shader: ^Shader) {
@@ -294,16 +297,7 @@ main :: proc() {
 		[]u16{0, 1, 2, 2, 3, 0},
 	)
 
-	camera := camera_init(
-		Camera_Base {
-			position = {0.0, 0.0, 3.0},
-			up = {0.0, 1.0, 0.0},
-			front = {0.0, 0.0, -1.0},
-			fovy = 50,
-			near = 0.1,
-			far = 100.0,
-		},
-	)
+	camera := camera_create(Camera_Base)
 
 	start_tick := time.tick_now()
 
@@ -337,14 +331,7 @@ main :: proc() {
 		gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
 		shader_use(&shader_default)
-
-		#partial switch &camera in camera.variant {
-		case Camera_Base:
-			// camera.position.y += 0.01
-			camera_update(&camera, &shader_default)
-		case Camera_Orbit:
-			camera_update(&camera, &shader_default)
-		}
+		camera_update(camera, &shader_default)
 
 		@(static)
 		object_position: glm.vec3
