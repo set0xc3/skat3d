@@ -8,6 +8,7 @@ import "core:strings"
 import "core:time"
 
 import gl "vendor:OpenGL"
+import cgltf "vendor:cgltf"
 import SDL "vendor:sdl2"
 
 WINDOW_WIDTH: f32 = 1920
@@ -48,26 +49,14 @@ Mesh :: struct {
 	indices:       []u16,
 }
 
-Camera_Base :: struct {
-	position, front, up: glm.vec3,
-	fovy, near, far:     f32,
-	variant:             union {
-		^Camera_Base,
-		^Camera_Orbit,
-	},
-}
-
-Camera_Orbit :: struct {
-	using base: Camera_Base,
-	target:     glm.vec3,
-	angle:      glm.vec2,
-	radius:     f32,
-}
-
 Context :: struct {
 	shader: Shader,
 	mesh:   Mesh,
-	camera: ^Camera_Base,
+	mouse:  struct {
+		position: glm.vec2,
+		delta:    glm.vec2,
+		wheel:    glm.vec2,
+	},
 }
 
 ctx: Context
@@ -207,44 +196,16 @@ shader_set_uniform_vec3 :: proc(shader: ^Shader, location: string, value: ^glm.v
 	gl.Uniform3fv(uniforms[location].location, 1, &value[0])
 }
 
-camera_create :: proc($T: typeid) -> ^T {
-	camera := new(T)
-	camera.variant = camera
-
-	#partial switch c in camera.variant {
-	case ^Camera_Base:
-		camera.position = {0.0, 0.0, 3.0}
-		camera.up = {0.0, 1.0, 0.0}
-		camera.front = {0.0, 0.0, -1.0}
-		camera.fovy = 50
-		camera.near = 0.1
-		camera.far = 100.0
-	case ^Camera_Orbit:
-	}
-
-	return camera
-}
-
-camera_update :: proc(camera: ^Camera_Base, shader: ^Shader) {
-	model := glm.identity(glm.mat4)
-	view := camera_get_view_matrix(camera)
-	projection := glm.mat4Perspective(
-		glm.radians(camera.fovy),
-		WINDOW_WIDTH / WINDOW_HEIGHT,
-		camera.near,
-		camera.far,
-	)
-
-	shader_use(shader)
-	shader_set_uniform_mat4(shader, "u_view", &view)
-	shader_set_uniform_mat4(shader, "u_projection", &projection)
-}
-
-camera_get_view_matrix :: proc(camera: ^Camera_Base) -> glm.mat4 {
-	return glm.mat4LookAt(camera.position, camera.position + camera.front, camera.up)
-}
-
 main :: proc() {
+	// TODO:
+	options: cgltf.options
+	data, result := cgltf.parse_file(options, "resources/models/shapes/cube.glb")
+	if result != .success {
+		fmt.eprintln("Failed cgltf.parse_file")
+		return
+	}
+	defer cgltf.free(data)
+
 	window := SDL.CreateWindow(
 	"Skat3D",
 	SDL.WINDOWPOS_UNDEFINED,
@@ -297,8 +258,6 @@ main :: proc() {
 		[]u16{0, 1, 2, 2, 3, 0},
 	)
 
-	camera := camera_create(Camera_Base)
-
 	start_tick := time.tick_now()
 
 	loop: for {
@@ -317,6 +276,11 @@ main :: proc() {
 				break loop
 			}
 
+			if event.motion.type == .MOUSEMOTION {
+				ctx.mouse.position = {auto_cast event.motion.x, auto_cast event.motion.y}
+				ctx.mouse.delta = {auto_cast event.motion.xrel, auto_cast event.motion.yrel}
+			}
+
 			if event.window.type == .WINDOWEVENT {
 				#partial switch event.window.event {
 				case .SIZE_CHANGED, .RESIZED:
@@ -331,7 +295,6 @@ main :: proc() {
 		gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
 		shader_use(&shader_default)
-		camera_update(camera, &shader_default)
 
 		@(static)
 		object_position: glm.vec3

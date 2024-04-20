@@ -39,7 +39,14 @@
         # pkgs.glslang # Khronos reference front-end for GLSL and ESSL
         # pkgs.shaderc
 
-        pkgs.odin
+        (pkgs.odin.overrideAttrs (previousAttrs: {
+          installPhase =
+            (previousAttrs.installPhase or "")
+            + ''
+              make -C $out/share/vendor/cgltf/src
+            '';
+        }))
+
         pkgs.SDL2
         # pkgs.libGL
         # pkgs.xorg.libX11
