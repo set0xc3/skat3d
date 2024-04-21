@@ -15,7 +15,7 @@ endif
 
 build:
 	mkdir -p bin
-	odin build src -out:bin/$(OUT_NAME) $(DEBUG_FLAGS) -build-mode:exe -collection:my=src
+	odin build src -out:bin/$(OUT_NAME) $(DEBUG_FLAGS) -build-mode:exe -collection:my=.
 
 run:
 	./bin/$(OUT_NAME)

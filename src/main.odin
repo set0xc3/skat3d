@@ -1,7 +1,9 @@
 package skat3d
 
 import "core:fmt"
+import "core:log"
 import glm "core:math/linalg/glsl"
+import "core:mem"
 import "core:os"
 import "core:path/filepath"
 import "core:strings"
@@ -197,14 +199,25 @@ shader_set_uniform_vec3 :: proc(shader: ^Shader, location: string, value: ^glm.v
 }
 
 main :: proc() {
-	// TODO:
-	options: cgltf.options
-	data, result := cgltf.parse_file(options, "resources/models/shapes/cube.glb")
-	if result != .success {
-		fmt.eprintln("Failed cgltf.parse_file")
-		return
+	when false {
+		context.logger = log.create_console_logger()
+
+		tracking_allocator: mem.Tracking_Allocator
+		mem.tracking_allocator_init(&tracking_allocator, context.allocator)
+		context.allocator = mem.tracking_allocator(&tracking_allocator)
+
+		reset_tracking_allocator :: proc(a: ^mem.Tracking_Allocator) -> bool {
+			leaks := false
+
+			for key, value in a.allocation_map {
+				fmt.printf("%v: Leaked %v bytes\n", value.location, value.size)
+				leaks = true
+			}
+
+			mem.tracking_allocator_clear(a)
+			return leaks
+		};defer reset_tracking_allocator(&tracking_allocator)
 	}
-	defer cgltf.free(data)
 
 	window := SDL.CreateWindow(
 	"Skat3D",
@@ -258,6 +271,9 @@ main :: proc() {
 		[]u16{0, 1, 2, 2, 3, 0},
 	)
 
+	camera := camera_create(.Camera_Flat, .Orthographic, {WINDOW_WIDTH, WINDOW_HEIGHT})
+	// camera := camera_create(.Camera_Orbit, .Perspective, {WINDOW_WIDTH, WINDOW_HEIGHT})
+
 	start_tick := time.tick_now()
 
 	loop: for {
@@ -286,6 +302,7 @@ main :: proc() {
 				case .SIZE_CHANGED, .RESIZED:
 					WINDOW_WIDTH = auto_cast event.window.data1
 					WINDOW_HEIGHT = auto_cast event.window.data2
+					camera_set_viewport(camera, {WINDOW_WIDTH, WINDOW_HEIGHT})
 				}
 			}
 		}
@@ -295,12 +312,15 @@ main :: proc() {
 		gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
 		shader_use(&shader_default)
+		shader_set_uniform_mat4(&shader_default, "u_view", &camera.view_matrix)
+		shader_set_uniform_mat4(&shader_default, "u_projection", &camera.projection_matrix)
 
 		@(static)
 		object_position: glm.vec3
-		// object_position.x += 0.01
+		// object_position.z -= 0.01
 		object_model := glm.identity(glm.mat4)
-		object_model = glm.mat4Translate({object_position.x, 0.0, 0.0})
+		// object_model *= glm.mat4Scale(1)
+		// object_model = glm.mat4Translate(object_position)
 		shader_set_uniform_mat4(&shader_default, "u_model", &object_model)
 
 		gl.BindVertexArray(test_mesh.vao)
