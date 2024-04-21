@@ -42,15 +42,14 @@ Camera :: struct {
 
 	// Orbit
 	orbit_mode:        Camera_Orbit,
-	zoom_type:         u32,
-	zoom_speed:        f32,
+	radius:            f32,
 }
 
 camera_update_projection :: proc(camera: ^Camera, type: Projection_Type) {
+	aspect := camera.viewport.x / camera.viewport.y
 	switch type {
 	case .Orthographic:
 		zoom: f32 = 1.0
-		aspect := camera.viewport.x / camera.viewport.y
 		camera.projection_matrix = glm.mat4Ortho3d(
 			-zoom * aspect,
 			zoom * aspect,
@@ -62,7 +61,7 @@ camera_update_projection :: proc(camera: ^Camera, type: Projection_Type) {
 	case .Perspective:
 		camera.projection_matrix = glm.mat4Perspective(
 			glm.radians(camera.fovy),
-			camera.viewport.x / camera.viewport.y,
+			aspect,
 			camera.near,
 			camera.far,
 		)
@@ -76,15 +75,27 @@ camera_create :: proc(mode: Camera_Mode, type: Projection_Type, viewport: glm.ve
 	camera.fovy = 45.0
 	camera.near = 0.01
 	camera.far = 1000.0
-	camera.position = {0.0, 0.0, 2.0}
 	camera.viewport = viewport
 
-	camera_update_projection(camera, type)
+	camera.view_matrix = glm.identity(glm.mat4)
+	camera.projection_matrix = glm.identity(glm.mat4)
 
-	#partial switch mode {
+	if type == .Perspective do camera.position = {0.0, 0.0, 2.0}
+
+	// Orbit
+	camera.orbit_mode = .On_Object_Center
+	camera.radius = 1.0
+
+	camera_update_projection(camera, type)
+	camera_update(camera)
+
+	return camera
+}
+
+camera_update :: proc(camera: ^Camera) {
+	#partial switch camera.mode {
 	case .Camera_Flat:
-		camera.position = {0.0, 0.0, 0.0}
-		camera.view_matrix = glm.mat4Translate(-camera.position)
+		camera.view_matrix = glm.mat4Translate({-camera.position.x, -camera.position.y, 0.0})
 	case .Camera_Orbit:
 		direction := glm.vec3{0.0, 0.0, -1.0}
 		right := glm.vec3{1.0, 0.0, 0.0}
@@ -93,10 +104,9 @@ camera_create :: proc(mode: Camera_Mode, type: Projection_Type, viewport: glm.ve
 			camera.position + direction,
 			glm.cross(right, direction),
 		)
-		camera.orbit_mode = .On_Object_Center
+		camera.view_matrix *= glm.mat4Translate({0.0, 0.0, -camera.radius})
+	// camera.view_matrix = glm.mat4Translate({-camera.position.x, -camera.position.y, -10.0})
 	}
-
-	return camera
 }
 
 camera_destroy :: proc(camera: ^Camera) {

@@ -48,7 +48,7 @@ World_Object :: struct {
 Mesh :: struct {
 	vao, vbo, ebo: u32,
 	vertices:      []Vertex,
-	indices:       []u16,
+	indices:       []u32,
 }
 
 Context :: struct {
@@ -244,35 +244,52 @@ main :: proc() {
 	test_mesh := mesh_create(
 		[]Vertex {
 			 {
-				position = {-0.5, +0.5, 0},
+				position = {0.5, 0.0, 0.5},
 				normal = {0.0, 0.0, 0.0},
 				color = {1.0, 0.0, 0.0, 0.75},
 				uv = {0.0, 0.0},
 			},
 			 {
-				position = {-0.5, -0.5, 0},
+				position = {-0.5, 0.0, 0.5},
 				normal = {0.0, 0.0, 0.0},
 				color = {1.0, 1.0, 0.0, 0.75},
 				uv = {0.0, 0.0},
 			},
 			 {
-				position = {+0.5, -0.5, 0},
+				position = {-0.5, 0.0, -0.5},
 				normal = {0.0, 0.0, 0.0},
 				color = {0.0, 1.0, 0.0, 0.75},
 				uv = {0.0, 0.0},
 			},
 			 {
-				position = {+0.5, +0.5, 0},
+				position = {0.5, 0.0, -0.5},
+				normal = {0.0, 0.0, 0.0},
+				color = {0.0, 0.0, 1.0, 0.75},
+				uv = {0.0, 0.0},
+			},
+			 {
+				position = {0.0, 1.0, 0.0},
+				normal = {0.0, 0.0, 0.0},
+				color = {0.0, 0.0, 1.0, 0.75},
+				uv = {0.0, 0.0},
+			},
+			 {
+				position = {0.0, -1.0, 0.0},
 				normal = {0.0, 0.0, 0.0},
 				color = {0.0, 0.0, 1.0, 0.75},
 				uv = {0.0, 0.0},
 			},
 		},
-		[]u16{0, 1, 2, 2, 3, 0},
+		[]u32{0, 4, 1, 1, 4, 2, 2, 4, 3, 3, 4, 0, 0, 5, 1, 1, 5, 2, 2, 5, 3, 3, 5, 0},
 	)
 
-	camera := camera_create(.Camera_Flat, .Orthographic, {WINDOW_WIDTH, WINDOW_HEIGHT})
-	// camera := camera_create(.Camera_Orbit, .Perspective, {WINDOW_WIDTH, WINDOW_HEIGHT})
+	// camera := camera_create(.Camera_Flat, .Orthographic, {WINDOW_WIDTH, WINDOW_HEIGHT})
+	camera := camera_create(.Camera_Orbit, .Perspective, {WINDOW_WIDTH, WINDOW_HEIGHT})
+	camera.position.y = 1.0
+
+	object_position: glm.vec3
+	object_rotation: glm.vec3
+	object_model := glm.identity(glm.mat4)
 
 	start_tick := time.tick_now()
 
@@ -283,6 +300,9 @@ main :: proc() {
 		event: SDL.Event
 		for SDL.PollEvent(&event) {
 			#partial switch event.type {
+			case .MOUSEWHEEL:
+				ctx.mouse.wheel.y = f32(event.wheel.y)
+				camera.radius += -ctx.mouse.wheel.y * 0.1
 			case .KEYDOWN:
 				#partial switch event.key.keysym.sym {
 				case .ESCAPE:
@@ -311,20 +331,17 @@ main :: proc() {
 		gl.ClearColor(0.5, 0.7, 1.0, 1.0)
 		gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
-		shader_use(&shader_default)
-		shader_set_uniform_mat4(&shader_default, "u_view", &camera.view_matrix)
-		shader_set_uniform_mat4(&shader_default, "u_projection", &camera.projection_matrix)
+		camera_update(camera)
 
-		@(static)
-		object_position: glm.vec3
-		// object_position.z -= 0.01
-		object_model := glm.identity(glm.mat4)
-		// object_model *= glm.mat4Scale(1)
-		// object_model = glm.mat4Translate(object_position)
+		shader_use(&shader_default)
+		shader_set_uniform_mat4(&shader_default, "u_projection", &camera.projection_matrix)
+		shader_set_uniform_mat4(&shader_default, "u_view", &camera.view_matrix)
+
+		object_model *= glm.mat4Rotate({0.0, 1.0, 0.0}, glm.radians_f32(1.0))
 		shader_set_uniform_mat4(&shader_default, "u_model", &object_model)
 
 		gl.BindVertexArray(test_mesh.vao)
-		gl.DrawElements(gl.TRIANGLES, i32(len(test_mesh.indices)), gl.UNSIGNED_SHORT, nil)
+		gl.DrawElements(gl.TRIANGLES, i32(len(test_mesh.indices)), gl.UNSIGNED_INT, nil)
 
 		SDL.GL_SwapWindow(window)
 	}
@@ -332,7 +349,7 @@ main :: proc() {
 
 // ======== Mesh ========
 
-mesh_create :: proc(vertices: []Vertex, indices: []u16) -> (mesh: Mesh) {
+mesh_create :: proc(vertices: []Vertex, indices: []u32) -> (mesh: Mesh) {
 	vao, vbo, ebo: u32
 
 	gl.GenVertexArrays(1, &vao)
