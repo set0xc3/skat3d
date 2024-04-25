@@ -48,8 +48,8 @@
         }))
 
         pkgs.SDL2
-        # pkgs.libGL
-        # pkgs.xorg.libX11
+        pkgs.libGL
+        pkgs.xorg.libX11
       ];
 
       # shellHook = ''
