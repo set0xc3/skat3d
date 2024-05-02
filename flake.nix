@@ -10,43 +10,11 @@
     devShells.${system}.default = pkgs.mkShell {
       LD_LIBRARY_PATH = "$LD_LIBRARY_PATH:${
         pkgs.lib.makeLibraryPath [
-          # pkgs.vulkan-extension-layer
-          # pkgs.vulkan-validation-layers
-          # pkgs.vulkan-utility-libraries
-          # pkgs.vulkan-headers
-          # pkgs.vulkan-loader
-          # pkgs.vulkan-tools
-          # pkgs.vulkan-tools-lunarg
-
-          # pkgs.odin
-          # pkgs.SDL2
-          # pkgs.libGL
-          # pkgs.xorg.libX11
         ]
       }";
 
       buildInputs = [
-        # pkgs.renderdoc
-        # pkgs.gpu-viewer
-
-        # pkgs.vulkan-extension-layer
-        # pkgs.vulkan-validation-layers
-        # pkgs.vulkan-utility-libraries
-        # pkgs.vulkan-headers
-        # pkgs.vulkan-loader
-        # pkgs.vulkan-tools
-        # pkgs.vulkan-tools-lunarg
-        # pkgs.glslang # Khronos reference front-end for GLSL and ESSL
-        # pkgs.shaderc
-
-        (pkgs.odin.overrideAttrs (previousAttrs: {
-          installPhase =
-            (previousAttrs.installPhase or "")
-            + ''
-              make -C $out/share/vendor/cgltf/src
-            '';
-        }))
-
+        pkgs.odin
         pkgs.SDL2
         pkgs.libGL
         pkgs.xorg.libX11

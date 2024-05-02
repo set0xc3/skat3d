@@ -10,7 +10,6 @@ import "core:strings"
 import "core:time"
 
 import gl "vendor:OpenGL"
-import cgltf "vendor:cgltf"
 import SDL "vendor:sdl2"
 
 WINDOW_WIDTH: f32 = 1920
@@ -240,50 +239,34 @@ main :: proc() {
 	gl.Enable(gl.DEPTH_TEST)
 
 	shader_default := shader_init("resources/shaders/default")
+	shader_line := shader_init("resources/shaders/line")
+
+	quad := mesh_create(
+		[]Vertex {
+			{position = {-1.0, 1.0, 0.0}, color = {1.0, 1.0, 1.0, 1.0}},
+			{position = {1.0, 1.0, 0.0}, color = {1.0, 1.0, 1.0, 1.0}},
+			{position = {-1.0, -1.0, 0.0}, color = {1.0, 1.0, 1.0, 1.0}},
+			{position = {1.0, 1.0, 0.0}, color = {1.0, 1.0, 1.0, 1.0}},
+			{position = {-1.0, -1.0, 0.0}, color = {1.0, 1.0, 1.0, 1.0}},
+			{position = {1.0, -1.0, 0.0}, color = {1.0, 1.0, 1.0, 1.0}},
+		},
+		nil,
+	)
 
 	test_mesh := mesh_create(
 		[]Vertex {
-			 {
-				position = {0.5, 0.0, 0.5},
-				normal = {0.0, 0.0, 0.0},
-				color = {1.0, 0.0, 0.0, 0.75},
-				uv = {0.0, 0.0},
-			},
-			 {
-				position = {-0.5, 0.0, 0.5},
-				normal = {0.0, 0.0, 0.0},
-				color = {1.0, 1.0, 0.0, 0.75},
-				uv = {0.0, 0.0},
-			},
-			 {
-				position = {-0.5, 0.0, -0.5},
-				normal = {0.0, 0.0, 0.0},
-				color = {0.0, 1.0, 0.0, 0.75},
-				uv = {0.0, 0.0},
-			},
-			 {
-				position = {0.5, 0.0, -0.5},
-				normal = {0.0, 0.0, 0.0},
-				color = {0.0, 0.0, 1.0, 0.75},
-				uv = {0.0, 0.0},
-			},
-			 {
-				position = {0.0, 1.0, 0.0},
-				normal = {0.0, 0.0, 0.0},
-				color = {0.0, 0.0, 1.0, 0.75},
-				uv = {0.0, 0.0},
-			},
-			 {
-				position = {0.0, -1.0, 0.0},
-				normal = {0.0, 0.0, 0.0},
-				color = {0.0, 0.0, 1.0, 0.75},
-				uv = {0.0, 0.0},
-			},
+			{position = {0.5, 0.0, 0.5}, normal = {0.0, 0.0, 0.0}, color = {1.0, 0.0, 0.0, 1.0}},
+			{position = {-0.5, 0.0, 0.5}, normal = {0.0, 0.0, 0.0}, color = {1.0, 1.0, 0.0, 1.0}},
+			{position = {-0.5, 0.0, -0.5}, normal = {0.0, 0.0, 0.0}, color = {0.0, 1.0, 0.0, 1.0}},
+			{position = {0.5, 0.0, -0.5}, normal = {0.0, 0.0, 0.0}, color = {0.0, 0.0, 1.0, 1.0}},
+			{position = {0.0, 1.0, 0.0}, normal = {0.0, 0.0, 0.0}, color = {0.0, 0.0, 1.0, 1.0}},
+			{position = {0.0, -1.0, 0.0}, normal = {0.0, 0.0, 0.0}, color = {0.0, 0.0, 1.0, 1.0}},
 		},
 		[]u32{0, 4, 1, 1, 4, 2, 2, 4, 3, 3, 4, 0, 0, 5, 1, 1, 5, 2, 2, 5, 3, 3, 5, 0},
 	)
 
-	// camera := camera_create(.Camera_Flat, .Orthographic, {WINDOW_WIDTH, WINDOW_HEIGHT})
+	flat_camera := camera_create(.Camera_Flat, .Orthographic, {WINDOW_WIDTH, WINDOW_HEIGHT})
+
 	camera := camera_create(.Camera_Orbit, .Perspective, {WINDOW_WIDTH, WINDOW_HEIGHT})
 	camera.position.y = 1.0
 
@@ -323,6 +306,7 @@ main :: proc() {
 					WINDOW_WIDTH = auto_cast event.window.data1 * 2
 					WINDOW_HEIGHT = auto_cast event.window.data2 * 2
 					camera_set_viewport(camera, {WINDOW_WIDTH, WINDOW_HEIGHT})
+					camera_set_viewport(flat_camera, {WINDOW_WIDTH, WINDOW_HEIGHT})
 				}
 			}
 		}
@@ -331,17 +315,35 @@ main :: proc() {
 		gl.ClearColor(0.5, 0.7, 1.0, 1.0)
 		gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
+
+		/* Drawing lines */
+		camera_update(flat_camera)
+		shader_use(&shader_line)
+		{
+			shader_set_uniform_mat4(&shader_line, "u_projection", &flat_camera.projection_matrix)
+			shader_set_uniform_mat4(&shader_line, "u_view", &flat_camera.view_matrix)
+
+			object_model := glm.identity(glm.mat4)
+			object_model *= glm.mat4Scale(0.5)
+			shader_set_uniform_mat4(&shader_line, "u_model", &object_model)
+
+			gl.BindVertexArray(quad.vao)
+			gl.DrawArrays(gl.TRIANGLES, 0, 6)
+		}
+
+		/* Drawing 3d models */
 		camera_update(camera)
-
 		shader_use(&shader_default)
-		shader_set_uniform_mat4(&shader_default, "u_projection", &camera.projection_matrix)
-		shader_set_uniform_mat4(&shader_default, "u_view", &camera.view_matrix)
+		{
+			shader_set_uniform_mat4(&shader_default, "u_projection", &camera.projection_matrix)
+			shader_set_uniform_mat4(&shader_default, "u_view", &camera.view_matrix)
 
-		object_model *= glm.mat4Rotate({0.0, 1.0, 0.0}, glm.radians_f32(1.0))
-		shader_set_uniform_mat4(&shader_default, "u_model", &object_model)
+			object_model *= glm.mat4Rotate({0.0, 1.0, 0.0}, glm.radians_f32(1.0))
+			shader_set_uniform_mat4(&shader_default, "u_model", &object_model)
 
-		gl.BindVertexArray(test_mesh.vao)
-		gl.DrawElements(gl.TRIANGLES, i32(len(test_mesh.indices)), gl.UNSIGNED_INT, nil)
+			gl.BindVertexArray(test_mesh.vao)
+			gl.DrawElements(gl.TRIANGLES, i32(len(test_mesh.indices)), gl.UNSIGNED_INT, nil)
+		}
 
 		SDL.GL_SwapWindow(window)
 	}
