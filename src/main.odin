@@ -147,23 +147,16 @@ shader_set_uniform_vec3 :: proc(shader: ^Shader, location: string, value: ^glm.v
 /* GFX */
 MAX_DRAWING :: 1000
 
-Drawing :: struct {
-	vertices: sa.Small_Array(MAX_DRAWING, []Flat_Vertex),
-}
-
-drawing_add_line :: proc(using ctx: ^Drawing) {
-	sa.push_back(&vertices, []Flat_Vertex{{position = {0.0, 0.0}, color = {1.0, 0.0, 1.0, 1.0}}})
-}
-
 Flat_Vertex :: struct {
 	position: glm.vec2,
 	color:    glm.vec4,
 }
 
 GFX_Context :: struct {
-	vao, vbo: u32,
-	idx:      u32,
-	vertices: [MAX_DRAWING]Flat_Vertex,
+	vao, vbo:       u32,
+	idx:            u32,
+	idx_vertex_len: [MAX_DRAWING]u32,
+	vertices:       sa.Small_Array(MAX_DRAWING, Flat_Vertex),
 }
 gfx_ctx: ^GFX_Context
 
@@ -200,7 +193,6 @@ gfx_ctx: ^GFX_Context
 */
 
 gfx_init :: proc() {
-	gfx_ctx = new(GFX_Context)
 	using gfx_ctx
 
 	gl.GenVertexArrays(1, &vao)
@@ -212,9 +204,10 @@ gfx_init :: proc() {
 	gl.BufferData(
 		gl.ARRAY_BUFFER,
 		MAX_DRAWING * size_of(Flat_Vertex),
-		&vertices[0],
+		&gfx_ctx.vertices.data[0],
 		gl.DYNAMIC_DRAW,
 	)
+	fmt.println(&gfx_ctx.vertices.data[0])
 
 	gl.EnableVertexAttribArray(0)
 	gl.EnableVertexAttribArray(1)
@@ -234,41 +227,6 @@ gfx_init :: proc() {
 		size_of(Flat_Vertex),
 		offset_of(Flat_Vertex, color),
 	)
-}
-
-gfx_begin :: proc() {
-	using gfx_ctx
-
-	idx = 0
-}
-
-gfx_end :: proc() {
-	using gfx_ctx
-
-	gl.BindVertexArray(gfx_ctx.vao)
-	gl.DrawArrays(gl.TRIANGLES, 0, 6)
-
-	gl.BindBuffer(gl.ARRAY_BUFFER, vbo)
-	gl.BufferSubData(gl.ARRAY_BUFFER, 0, MAX_DRAWING * size_of(Flat_Vertex), &vertices[0])
-}
-
-gfx_draw_line :: proc(start, end: glm.vec2, color: glm.vec4) {
-	using gfx_ctx
-
-	vertices[idx + 0].position = start
-	vertices[idx + 0].color = color
-
-	vertices[idx + 1].position = end
-	vertices[idx + 1].color = color
-
-	idx += 1
-}
-
-gfx_draw_rectangle :: proc(start, end: glm.vec2, color: glm.vec4) {
-	// using gfx_ctx
-
-	// gl.BindBuffer(gl.ARRAY_BUFFER, vbo)
-	// gl.BufferSubData(gl.ARRAY_BUFFER, 0, MAX_DRAWING * size_of(Flat_Vertex), &vertices[0])
 }
 
 main :: proc() {
@@ -312,6 +270,32 @@ main :: proc() {
 
 	gl.Enable(gl.DEPTH_TEST)
 
+	gfx_ctx = new(GFX_Context)
+	gfx_ctx.idx_vertex_len[gfx_ctx.idx] = 6
+	sa.push_back(
+		&gfx_ctx.vertices,
+		Flat_Vertex{position = {-0.5, 0.5}, color = {1.0, 0.0, 1.0, 1.0}},
+	)
+	sa.push_back(
+		&gfx_ctx.vertices,
+		Flat_Vertex{position = {0.5, 0.5}, color = {1.0, 0.0, 1.0, 1.0}},
+	)
+	sa.push_back(
+		&gfx_ctx.vertices,
+		Flat_Vertex{position = {-0.5, -0.5}, color = {1.0, 0.0, 1.0, 1.0}},
+	)
+	sa.push_back(
+		&gfx_ctx.vertices,
+		Flat_Vertex{position = {0.5, 0.5}, color = {1.0, 0.0, 1.0, 1.0}},
+	)
+	sa.push_back(
+		&gfx_ctx.vertices,
+		Flat_Vertex{position = {-0.5, -0.5}, color = {1.0, 0.0, 1.0, 1.0}},
+	)
+	sa.push_back(
+		&gfx_ctx.vertices,
+		Flat_Vertex{position = {0.5, -0.5}, color = {1.0, 0.0, 1.0, 1.0}},
+	)
 	gfx_init()
 
 	shader_default := shader_init("resources/shaders/default")
@@ -391,8 +375,6 @@ main :: proc() {
 		gl.ClearColor(0.5, 0.7, 1.0, 1.0)
 		gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
-		gfx_begin()
-
 		/* Drawing lines */
 		camera_update(flat_camera)
 		shader_use(&shader_flat)
@@ -402,25 +384,13 @@ main :: proc() {
 			shader_set_uniform_mat4(&shader_flat, "u_projection", &flat_camera.projection_matrix)
 			shader_set_uniform_mat4(&shader_flat, "u_view", &flat_camera.view_matrix)
 
-			gfx_draw_line({0.0, 0.0}, {1.0, 1.0}, {1.0, 0.0, 1.0, 1.0})
 			gl.BindVertexArray(gfx_ctx.vao)
-			gl.DrawArrays(gl.LINES, 0, 2)
-		}
 
-		/* Drawing lines */
-		camera_update(flat_camera)
-		shader_use(&shader_flat)
-		{
-			shader_set_uniform_mat4(&shader_flat, "u_projection", &flat_camera.projection_matrix)
-			shader_set_uniform_mat4(&shader_flat, "u_view", &flat_camera.view_matrix)
-
-			object_model := glm.identity(glm.mat4)
-			object_model *= glm.mat4Scale(0.5)
-			shader_set_uniform_mat4(&shader_flat, "u_model", &object_model)
-
-			gfx_draw_rectangle({0.0, 0.0}, {10.0, 10.0}, {1.0, 0.0, 1.0, 1.0})
-			gl.BindVertexArray(gfx_ctx.vao)
-			gl.DrawArrays(gl.TRIANGLES, 0, 6)
+			if gfx_ctx.idx_vertex_len[gfx_ctx.idx] == 2 {
+				gl.DrawArrays(gl.LINES, 0, 2)
+			} else if gfx_ctx.idx_vertex_len[gfx_ctx.idx] % 3 == 0 {
+				gl.DrawArrays(gl.TRIANGLES, 0, i32(gfx_ctx.idx_vertex_len[gfx_ctx.idx]))
+			}
 		}
 
 		/* Drawing 3d models */
@@ -437,7 +407,6 @@ main :: proc() {
 			gl.DrawElements(gl.TRIANGLES, i32(len(test_mesh.indices)), gl.UNSIGNED_INT, nil)
 		}
 
-		gfx_end()
 		SDL.GL_SwapWindow(window)
 	}
 }

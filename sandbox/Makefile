@@ -1,3 +1,7 @@
 camera:
 	mkdir -p bin
 	odin run $@.odin -file -out:bin/$@.bin -debug -o:none -collection:skat3d=../
+
+gfx:
+	mkdir -p bin
+	odin run $@.odin -file -out:bin/$@.bin -debug -o:none -collection:skat3d=../
