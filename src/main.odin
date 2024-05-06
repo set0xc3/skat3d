@@ -1,5 +1,6 @@
 package skat3d
 
+import sa "core:container/small_array"
 import "core:fmt"
 import "core:log"
 import glm "core:math/linalg/glsl"
@@ -14,8 +15,6 @@ import SDL "vendor:sdl2"
 
 WINDOW_WIDTH: f32 = 1920
 WINDOW_HEIGHT: f32 = 1080
-
-MAX_OBJECTS :: 1000
 
 Vertex :: struct {
 	position: glm.vec3,
@@ -126,58 +125,6 @@ shader_init :: proc(path: string) -> (shader: Shader) {
 	return
 }
 
-gl_init :: proc() {
-	// initialization of OpenGL buffers
-	vao, vbo, ebo: u32
-	gl.GenVertexArrays(1, &vao)
-	gl.GenBuffers(1, &vbo)
-	gl.GenBuffers(1, &ebo)
-
-	gl.BindVertexArray(vao)
-
-	// Craete empty vertex buffer
-	// gl.BindBuffer(gl.ARRAY_BUFFER, vbo)
-	// gl.BufferData(gl.ARRAY_BUFFER, 0, nil, gl.DYNAMIC_DRAW)
-
-	// Update vertex buffer
-	// gl.BufferData(
-	// 	gl.ARRAY_BUFFER,
-	// 	len(vertices) * size_of(vertices[0]),
-	// 	raw_data(vertices),
-	// 	gl.DYNAMIC_DRAW,
-	// )
-	// gl.BufferSubData(gl.ARRAY_BUFFER, 0, len(vertices) * size_of(vertices[0]), raw_data(vertices))
-
-	gl.EnableVertexAttribArray(0)
-	gl.EnableVertexAttribArray(1)
-	gl.EnableVertexAttribArray(2)
-	gl.EnableVertexAttribArray(3)
-	gl.VertexAttribPointer(0, 3, gl.FLOAT, false, size_of(Vertex), offset_of(Vertex, position))
-	gl.VertexAttribPointer(1, 3, gl.FLOAT, false, size_of(Vertex), offset_of(Vertex, normal))
-	gl.VertexAttribPointer(2, 4, gl.FLOAT, false, size_of(Vertex), offset_of(Vertex, color))
-	gl.VertexAttribPointer(3, 2, gl.FLOAT, false, size_of(Vertex), offset_of(Vertex, uv))
-
-	// Craete empty index buffer
-	// gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, ebo)
-	// gl.BufferData(gl.ELEMENT_ARRAY_BUFFER, 0, nil, gl.DYNAMIC_DRAW)
-
-	// Update index buffer
-	// gl.BufferData(
-	// 	gl.ELEMENT_ARRAY_BUFFER,
-	// 	len(indices) * size_of(indices[0]),
-	// 	raw_data(indices),
-	// 	gl.DYNAMIC_DRAW,
-	// )
-	// gl.BufferSubData(
-	// 	gl.ELEMENT_ARRAY_BUFFER,
-	// 	0,
-	// 	len(indices) * size_of(indices[0]),
-	// 	raw_data(indices),
-	// )
-
-	gl.BindVertexArray(0)
-}
-
 shader_use :: proc(shader: ^Shader) {
 	gl.UseProgram(shader.id)
 }
@@ -195,6 +142,133 @@ shader_set_uniform_vec2 :: proc(shader: ^Shader, location: string, value: ^glm.v
 shader_set_uniform_vec3 :: proc(shader: ^Shader, location: string, value: ^glm.vec3) {
 	uniforms := gl.get_uniforms_from_program(shader.id)
 	gl.Uniform3fv(uniforms[location].location, 1, &value[0])
+}
+
+/* GFX */
+MAX_DRAWING :: 1000
+
+Drawing :: struct {
+	vertices: sa.Small_Array(MAX_DRAWING, []Flat_Vertex),
+}
+
+drawing_add_line :: proc(using ctx: ^Drawing) {
+	sa.push_back(&vertices, []Flat_Vertex{{position = {0.0, 0.0}, color = {1.0, 0.0, 1.0, 1.0}}})
+}
+
+Flat_Vertex :: struct {
+	position: glm.vec2,
+	color:    glm.vec4,
+}
+
+GFX_Context :: struct {
+	vao, vbo: u32,
+	idx:      u32,
+	vertices: [MAX_DRAWING]Flat_Vertex,
+}
+gfx_ctx: ^GFX_Context
+
+
+/*
+	// Line 1
+	// idx: 0
+	0 - 0:[position, color]
+	1 - 1:[position, color]
+
+	// Line 2
+	// idx: 1
+	2 - 0:[position, color]
+	3 - 1:[position, color]
+
+	// Quad
+	// idx: 2
+	4 - 0:[position, color]
+	5 - 1:[position, color]
+	6 - 2:[position, color]
+	7 - 3:[position, color]
+	8 - 4:[position, color]
+	9 - 5:[position, color]
+
+	// Point
+	// idx: 3
+	10 - 0:[position, color]
+
+	// Shape?
+	// idx: 4
+	11 - 0:[position, color]
+	12 - 1:[position, color]
+	13 - 2:[position, color]
+*/
+
+gfx_init :: proc() {
+	gfx_ctx = new(GFX_Context)
+	using gfx_ctx
+
+	gl.GenVertexArrays(1, &vao)
+	gl.GenBuffers(1, &vbo)
+
+	gl.BindVertexArray(vao)
+
+	gl.BindBuffer(gl.ARRAY_BUFFER, vbo)
+	gl.BufferData(
+		gl.ARRAY_BUFFER,
+		MAX_DRAWING * size_of(Flat_Vertex),
+		&vertices[0],
+		gl.DYNAMIC_DRAW,
+	)
+
+	gl.EnableVertexAttribArray(0)
+	gl.EnableVertexAttribArray(1)
+	gl.VertexAttribPointer(
+		0,
+		2,
+		gl.FLOAT,
+		false,
+		size_of(Flat_Vertex),
+		offset_of(Flat_Vertex, position),
+	)
+	gl.VertexAttribPointer(
+		1,
+		4,
+		gl.FLOAT,
+		false,
+		size_of(Flat_Vertex),
+		offset_of(Flat_Vertex, color),
+	)
+}
+
+gfx_begin :: proc() {
+	using gfx_ctx
+
+	idx = 0
+}
+
+gfx_end :: proc() {
+	using gfx_ctx
+
+	gl.BindVertexArray(gfx_ctx.vao)
+	gl.DrawArrays(gl.TRIANGLES, 0, 6)
+
+	gl.BindBuffer(gl.ARRAY_BUFFER, vbo)
+	gl.BufferSubData(gl.ARRAY_BUFFER, 0, MAX_DRAWING * size_of(Flat_Vertex), &vertices[0])
+}
+
+gfx_draw_line :: proc(start, end: glm.vec2, color: glm.vec4) {
+	using gfx_ctx
+
+	vertices[idx + 0].position = start
+	vertices[idx + 0].color = color
+
+	vertices[idx + 1].position = end
+	vertices[idx + 1].color = color
+
+	idx += 1
+}
+
+gfx_draw_rectangle :: proc(start, end: glm.vec2, color: glm.vec4) {
+	// using gfx_ctx
+
+	// gl.BindBuffer(gl.ARRAY_BUFFER, vbo)
+	// gl.BufferSubData(gl.ARRAY_BUFFER, 0, MAX_DRAWING * size_of(Flat_Vertex), &vertices[0])
 }
 
 main :: proc() {
@@ -219,12 +293,12 @@ main :: proc() {
 	}
 
 	window := SDL.CreateWindow(
-	"Skat3D",
-	SDL.WINDOWPOS_UNDEFINED,
-	SDL.WINDOWPOS_UNDEFINED,
-	auto_cast WINDOW_WIDTH,
-	auto_cast WINDOW_HEIGHT,
-	{.RESIZABLE,  /* .FULLSCREEN, */.ALLOW_HIGHDPI, .OPENGL},
+		"Skat3D",
+		SDL.WINDOWPOS_UNDEFINED,
+		SDL.WINDOWPOS_UNDEFINED,
+		auto_cast WINDOW_WIDTH,
+		auto_cast WINDOW_HEIGHT,
+		{.RESIZABLE, .ALLOW_HIGHDPI, .OPENGL},
 	)
 	if window == nil {
 		fmt.eprintln("Failed to create window")
@@ -238,8 +312,10 @@ main :: proc() {
 
 	gl.Enable(gl.DEPTH_TEST)
 
+	gfx_init()
+
 	shader_default := shader_init("resources/shaders/default")
-	shader_line := shader_init("resources/shaders/line")
+	shader_flat := shader_init("resources/shaders/flat")
 
 	quad := mesh_create(
 		[]Vertex {
@@ -315,19 +391,35 @@ main :: proc() {
 		gl.ClearColor(0.5, 0.7, 1.0, 1.0)
 		gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
+		gfx_begin()
 
 		/* Drawing lines */
 		camera_update(flat_camera)
-		shader_use(&shader_line)
+		shader_use(&shader_flat)
 		{
-			shader_set_uniform_mat4(&shader_line, "u_projection", &flat_camera.projection_matrix)
-			shader_set_uniform_mat4(&shader_line, "u_view", &flat_camera.view_matrix)
+			object_model := glm.identity(glm.mat4)
+			shader_set_uniform_mat4(&shader_flat, "u_model", &object_model)
+			shader_set_uniform_mat4(&shader_flat, "u_projection", &flat_camera.projection_matrix)
+			shader_set_uniform_mat4(&shader_flat, "u_view", &flat_camera.view_matrix)
+
+			gfx_draw_line({0.0, 0.0}, {1.0, 1.0}, {1.0, 0.0, 1.0, 1.0})
+			gl.BindVertexArray(gfx_ctx.vao)
+			gl.DrawArrays(gl.LINES, 0, 2)
+		}
+
+		/* Drawing lines */
+		camera_update(flat_camera)
+		shader_use(&shader_flat)
+		{
+			shader_set_uniform_mat4(&shader_flat, "u_projection", &flat_camera.projection_matrix)
+			shader_set_uniform_mat4(&shader_flat, "u_view", &flat_camera.view_matrix)
 
 			object_model := glm.identity(glm.mat4)
 			object_model *= glm.mat4Scale(0.5)
-			shader_set_uniform_mat4(&shader_line, "u_model", &object_model)
+			shader_set_uniform_mat4(&shader_flat, "u_model", &object_model)
 
-			gl.BindVertexArray(quad.vao)
+			gfx_draw_rectangle({0.0, 0.0}, {10.0, 10.0}, {1.0, 0.0, 1.0, 1.0})
+			gl.BindVertexArray(gfx_ctx.vao)
 			gl.DrawArrays(gl.TRIANGLES, 0, 6)
 		}
 
@@ -345,6 +437,7 @@ main :: proc() {
 			gl.DrawElements(gl.TRIANGLES, i32(len(test_mesh.indices)), gl.UNSIGNED_INT, nil)
 		}
 
+		gfx_end()
 		SDL.GL_SwapWindow(window)
 	}
 }
