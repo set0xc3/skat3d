@@ -3,7 +3,7 @@
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
   };
 
-  outputs = {nixpkgs, ...} @ inputs: let
+  outputs = {nixpkgs, ...}: let
     system = "x86_64-linux";
     pkgs = nixpkgs.legacyPackages.${system};
   in {
@@ -13,16 +13,12 @@
         ]
       }";
 
-      buildInputs = [
-        pkgs.odin
-        pkgs.SDL2
-        pkgs.libGL
-        pkgs.xorg.libX11
+      buildInputs = with pkgs; [
+        odin
+        SDL2
+        libGL
+        xorg.libX11
       ];
-
-      # shellHook = ''
-      #   exec $SHELL
-      # '';
     };
   };
 }

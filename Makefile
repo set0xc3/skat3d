@@ -18,4 +18,4 @@ build:
 	odin build src -out:bin/$(OUT_NAME) $(DEBUG_FLAGS) -build-mode:exe -collection:my=.
 
 run:
-	SDL_VIDEODRIVER=wayland ./bin/$(OUT_NAME)
+	./bin/$(OUT_NAME)
