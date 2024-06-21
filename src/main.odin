@@ -144,56 +144,48 @@ shader_set_uniform_vec3 :: proc(shader: ^Shader, location: string, value: ^glm.v
 	gl.Uniform3fv(uniforms[location].location, 1, &value[0])
 }
 
-/* GFX */
-MAX_DRAWING :: 1000
-
-Flat_Vertex :: struct {
+UI_Vertex :: struct {
 	position: glm.vec2,
 	color:    glm.vec4,
 }
 
-GFX_Context :: struct {
-	vao, vbo:       u32,
-	idx:            u32,
-	idx_vertex_len: [MAX_DRAWING]u32,
-	vertices:       sa.Small_Array(MAX_DRAWING, Flat_Vertex),
+UI_Object :: struct {
+	id:       u32,
+	vertices: [dynamic]UI_Vertex,
 }
-gfx_ctx: ^GFX_Context
 
+UI_Context :: struct {
+	vao, vbo: u32,
+	objects:  [dynamic]UI_Object,
+}
+ui_ctx: UI_Context
 
-/*
-	// Line 1
-	// idx: 0
-	0 - 0:[position, color]
-	1 - 1:[position, color]
+ui_draw_point :: proc(ctx: ^UI_Context, position: glm.vec2, color: glm.vec4) {
+	object: UI_Object
+	append(&object.vertices, UI_Vertex{position, color})
+	append(&ctx.objects, object)
+}
 
-	// Line 2
-	// idx: 1
-	2 - 0:[position, color]
-	3 - 1:[position, color]
+ui_draw_line :: proc(ctx: ^UI_Context, start, end: glm.vec2, color: glm.vec4) {
+	object: UI_Object
+	append(&object.vertices, UI_Vertex{start, color})
+	append(&object.vertices, UI_Vertex{end, color})
+	append(&ctx.objects, object)
+}
 
-	// Quad
-	// idx: 2
-	4 - 0:[position, color]
-	5 - 1:[position, color]
-	6 - 2:[position, color]
-	7 - 3:[position, color]
-	8 - 4:[position, color]
-	9 - 5:[position, color]
+ui_draw_rectangle :: proc(ctx: ^UI_Context, position, size: glm.vec2, color: glm.vec4) {
+	object: UI_Object
+	append(&object.vertices, UI_Vertex{{position.x + size.x, position.y + size.y}, color}) // top right
+	append(&object.vertices, UI_Vertex{{position.x + size.x, position.y - size.y}, color}) // bottom right
+	append(&object.vertices, UI_Vertex{{position.x - size.x, position.y + size.y}, color}) // top left
+	append(&object.vertices, UI_Vertex{{position.x + size.x, position.y - size.y}, color}) // bottom right
+	append(&object.vertices, UI_Vertex{{position.x - size.x, position.y - size.y}, color}) // bottom left
+	append(&object.vertices, UI_Vertex{{position.x - size.x, position.y + size.y}, color}) // top left
+	append(&ctx.objects, object)
+}
 
-	// Point
-	// idx: 3
-	10 - 0:[position, color]
-
-	// Shape?
-	// idx: 4
-	11 - 0:[position, color]
-	12 - 1:[position, color]
-	13 - 2:[position, color]
-*/
-
-gfx_init :: proc() {
-	using gfx_ctx
+ui_init :: proc() {
+	using ui_ctx
 
 	gl.GenVertexArrays(1, &vao)
 	gl.GenBuffers(1, &vbo)
@@ -201,13 +193,7 @@ gfx_init :: proc() {
 	gl.BindVertexArray(vao)
 
 	gl.BindBuffer(gl.ARRAY_BUFFER, vbo)
-	gl.BufferData(
-		gl.ARRAY_BUFFER,
-		MAX_DRAWING * size_of(Flat_Vertex),
-		&gfx_ctx.vertices.data[0],
-		gl.DYNAMIC_DRAW,
-	)
-	fmt.println(&gfx_ctx.vertices.data[0])
+	gl.BufferData(gl.ARRAY_BUFFER, 0, nil, gl.DYNAMIC_DRAW)
 
 	gl.EnableVertexAttribArray(0)
 	gl.EnableVertexAttribArray(1)
@@ -216,17 +202,10 @@ gfx_init :: proc() {
 		2,
 		gl.FLOAT,
 		false,
-		size_of(Flat_Vertex),
-		offset_of(Flat_Vertex, position),
+		size_of(UI_Vertex),
+		offset_of(UI_Vertex, position),
 	)
-	gl.VertexAttribPointer(
-		1,
-		4,
-		gl.FLOAT,
-		false,
-		size_of(Flat_Vertex),
-		offset_of(Flat_Vertex, color),
-	)
+	gl.VertexAttribPointer(1, 4, gl.FLOAT, false, size_of(UI_Vertex), offset_of(UI_Vertex, color))
 }
 
 main :: proc() {
@@ -270,33 +249,11 @@ main :: proc() {
 
 	gl.Enable(gl.DEPTH_TEST)
 
-	gfx_ctx = new(GFX_Context)
-	gfx_ctx.idx_vertex_len[gfx_ctx.idx] = 6
-	sa.push_back(
-		&gfx_ctx.vertices,
-		Flat_Vertex{position = {-0.5, 0.5}, color = {1.0, 0.0, 1.0, 1.0}},
-	)
-	sa.push_back(
-		&gfx_ctx.vertices,
-		Flat_Vertex{position = {0.5, 0.5}, color = {1.0, 0.0, 1.0, 1.0}},
-	)
-	sa.push_back(
-		&gfx_ctx.vertices,
-		Flat_Vertex{position = {-0.5, -0.5}, color = {1.0, 0.0, 1.0, 1.0}},
-	)
-	sa.push_back(
-		&gfx_ctx.vertices,
-		Flat_Vertex{position = {0.5, 0.5}, color = {1.0, 0.0, 1.0, 1.0}},
-	)
-	sa.push_back(
-		&gfx_ctx.vertices,
-		Flat_Vertex{position = {-0.5, -0.5}, color = {1.0, 0.0, 1.0, 1.0}},
-	)
-	sa.push_back(
-		&gfx_ctx.vertices,
-		Flat_Vertex{position = {0.5, -0.5}, color = {1.0, 0.0, 1.0, 1.0}},
-	)
-	gfx_init()
+	ui_init()
+	ui_draw_point(&ui_ctx, {0.0, 0.0}, {1.0, 1.0, 1.0, 1.0})
+	ui_draw_point(&ui_ctx, {0.0, 0.0}, {1.0, 1.0, 1.0, 1.0})
+	ui_draw_line(&ui_ctx, {0.0, 0.0}, {1.0, 1.0}, {1.0, 1.0, 1.0, 1.0})
+	ui_draw_rectangle(&ui_ctx, {0.0, 0.0}, {10.0, 10.0}, {1.0, 1.0, 1.0, 1.0})
 
 	shader_default := shader_init("resources/shaders/default")
 	shader_flat := shader_init("resources/shaders/flat")
@@ -384,13 +341,30 @@ main :: proc() {
 			shader_set_uniform_mat4(&shader_flat, "u_projection", &flat_camera.projection_matrix)
 			shader_set_uniform_mat4(&shader_flat, "u_view", &flat_camera.view_matrix)
 
-			gl.BindVertexArray(gfx_ctx.vao)
-
-			if gfx_ctx.idx_vertex_len[gfx_ctx.idx] == 2 {
-				gl.DrawArrays(gl.LINES, 0, 2)
-			} else if gfx_ctx.idx_vertex_len[gfx_ctx.idx] % 3 == 0 {
-				gl.DrawArrays(gl.TRIANGLES, 0, i32(gfx_ctx.idx_vertex_len[gfx_ctx.idx]))
+			for object, idx in ui_ctx.objects {
+				switch len(object.vertices) {
+				case 1:
+				// fmt.println("Draw point")
+				case 2:
+					gl.BindVertexArray(ui_ctx.vao)
+					gl.BufferSubData(
+						gl.ARRAY_BUFFER,
+						0,
+						size_of(object.vertices),
+						raw_data(object.vertices),
+					)
+					gl.DrawArrays(gl.LINES, 0, 2)
+					fmt.println(object.vertices)
+				case 6:
+				// fmt.println("Draw rectangle")
+				}
 			}
+
+			// if gfx_ctx.idx_vertex_len[gfx_ctx.idx] == 2 {
+			// 	gl.DrawArrays(gl.LINES, 0, 2)
+			// } else if gfx_ctx.idx_vertex_len[gfx_ctx.idx] % 3 == 0 {
+			// 	gl.DrawArrays(gl.TRIANGLES, 0, i32(gfx_ctx.idx_vertex_len[gfx_ctx.idx]))
+			// }
 		}
 
 		/* Drawing 3d models */
