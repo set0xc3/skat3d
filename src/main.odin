@@ -193,7 +193,7 @@ ui_init :: proc() {
 	gl.BindVertexArray(vao)
 
 	gl.BindBuffer(gl.ARRAY_BUFFER, vbo)
-	gl.BufferData(gl.ARRAY_BUFFER, 0, nil, gl.DYNAMIC_DRAW)
+	gl.BufferData(gl.ARRAY_BUFFER, size_of(UI_Vertex) * 1000, nil, gl.DYNAMIC_DRAW)
 
 	gl.EnableVertexAttribArray(0)
 	gl.EnableVertexAttribArray(1)
@@ -235,7 +235,7 @@ main :: proc() {
 		SDL.WINDOWPOS_UNDEFINED,
 		auto_cast WINDOW_WIDTH,
 		auto_cast WINDOW_HEIGHT,
-		{.RESIZABLE, .ALLOW_HIGHDPI, .OPENGL},
+		{.RESIZABLE, .ALLOW_HIGHDPI},
 	)
 	if window == nil {
 		fmt.eprintln("Failed to create window")
@@ -250,10 +250,10 @@ main :: proc() {
 	gl.Enable(gl.DEPTH_TEST)
 
 	ui_init()
-	ui_draw_point(&ui_ctx, {0.0, 0.0}, {1.0, 1.0, 1.0, 1.0})
-	ui_draw_point(&ui_ctx, {0.0, 0.0}, {1.0, 1.0, 1.0, 1.0})
+	// ui_draw_point(&ui_ctx, {0.0, 0.0}, {1.0, 1.0, 1.0, 1.0})
+	// ui_draw_point(&ui_ctx, {0.0, 0.0}, {1.0, 1.0, 1.0, 1.0})
 	ui_draw_line(&ui_ctx, {0.0, 0.0}, {1.0, 1.0}, {1.0, 1.0, 1.0, 1.0})
-	ui_draw_rectangle(&ui_ctx, {0.0, 0.0}, {10.0, 10.0}, {1.0, 1.0, 1.0, 1.0})
+	// ui_draw_rectangle(&ui_ctx, {0.0, 0.0}, {10.0, 10.0}, {1.0, 1.0, 1.0, 1.0})
 
 	shader_default := shader_init("resources/shaders/default")
 	shader_flat := shader_init("resources/shaders/flat")
@@ -332,7 +332,7 @@ main :: proc() {
 		gl.ClearColor(0.5, 0.7, 1.0, 1.0)
 		gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
-		/* Drawing lines */
+		/* Drawing 2d */
 		camera_update(flat_camera)
 		shader_use(&shader_flat)
 		{
@@ -342,44 +342,31 @@ main :: proc() {
 			shader_set_uniform_mat4(&shader_flat, "u_view", &flat_camera.view_matrix)
 
 			for object, idx in ui_ctx.objects {
-				switch len(object.vertices) {
-				case 1:
-				// fmt.println("Draw point")
-				case 2:
-					gl.BindVertexArray(ui_ctx.vao)
-					gl.BufferSubData(
-						gl.ARRAY_BUFFER,
-						0,
-						size_of(object.vertices),
-						raw_data(object.vertices),
-					)
-					gl.DrawArrays(gl.LINES, 0, 2)
-					fmt.println(object.vertices)
-				case 6:
-				// fmt.println("Draw rectangle")
-				}
+				gl.BindVertexArray(ui_ctx.vao)
+				gl.BufferSubData(
+					gl.ARRAY_BUFFER,
+					0,
+					size_of(object.vertices),
+					raw_data(object.vertices),
+				)
+				gl.DrawArrays(gl.LINES, 0, 2)
+				// fmt.println(idx, &object.vertices[1])
 			}
-
-			// if gfx_ctx.idx_vertex_len[gfx_ctx.idx] == 2 {
-			// 	gl.DrawArrays(gl.LINES, 0, 2)
-			// } else if gfx_ctx.idx_vertex_len[gfx_ctx.idx] % 3 == 0 {
-			// 	gl.DrawArrays(gl.TRIANGLES, 0, i32(gfx_ctx.idx_vertex_len[gfx_ctx.idx]))
-			// }
 		}
 
 		/* Drawing 3d models */
-		camera_update(camera)
-		shader_use(&shader_default)
-		{
-			shader_set_uniform_mat4(&shader_default, "u_projection", &camera.projection_matrix)
-			shader_set_uniform_mat4(&shader_default, "u_view", &camera.view_matrix)
-
-			object_model *= glm.mat4Rotate({0.0, 1.0, 0.0}, glm.radians_f32(1.0))
-			shader_set_uniform_mat4(&shader_default, "u_model", &object_model)
-
-			gl.BindVertexArray(test_mesh.vao)
-			gl.DrawElements(gl.TRIANGLES, i32(len(test_mesh.indices)), gl.UNSIGNED_INT, nil)
-		}
+		// camera_update(camera)
+		// shader_use(&shader_default)
+		// {
+		// 	shader_set_uniform_mat4(&shader_default, "u_projection", &camera.projection_matrix)
+		// 	shader_set_uniform_mat4(&shader_default, "u_view", &camera.view_matrix)
+		//
+		// 	object_model *= glm.mat4Rotate({0.0, 1.0, 0.0}, glm.radians_f32(1.0))
+		// 	shader_set_uniform_mat4(&shader_default, "u_model", &object_model)
+		//
+		// 	gl.BindVertexArray(test_mesh.vao)
+		// 	gl.DrawElements(gl.TRIANGLES, i32(len(test_mesh.indices)), gl.UNSIGNED_INT, nil)
+		// }
 
 		SDL.GL_SwapWindow(window)
 	}
